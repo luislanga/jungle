@@ -3,12 +3,8 @@
     "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": [
-      "ES2023"
-    ],
-    "types": [
-      "bun"
-    ],
+    "lib": ["ES2023"],
+    "types": ["bun"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -21,13 +17,8 @@
     "skipLibCheck": true,
     "outDir": "./dist",
     "paths": {
-      "@/*": [
-        "./src/*.ts"
-      ]
+      "@/*": ["./src/*.ts"]
     }
   },
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

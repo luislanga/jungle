@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+test-results/
+bun.lock
+.env
+.env.*
+
+# Preserve the challenge specification and local Codex artifacts.
+README.md
+AGENTS.md
+ARCHITECTURE.md
+docs/planning/
+.codex/

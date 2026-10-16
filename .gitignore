@@ -1,5 +1,12 @@
 node_modules/
 dist/
+coverage/
+test-results/
+.eslintcache
+*.tsbuildinfo
+*.log
+.idea/
+.vscode/
 
 .env
 .env.*
