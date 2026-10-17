@@ -5,6 +5,7 @@ import {
   OPENING_IDEMPOTENCY_PREFIX,
 } from '@/shared/consts/wager.constant';
 import { isAllowedCurrency } from '@/shared/utils/money.util';
+import { PROCESSING_DURATION, OUTCOME_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { writeLog } from '@/shared/infrastructure/logging/application.logger';
 import type { DataSource } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
@@ -40,6 +41,7 @@ export class OpenWalletUseCase {
   async execute(input: OpenWalletInput, context: EventContext): Promise<Wallet> {
     if (!isAllowedCurrency(input.initialBalance.currency))
       throw new DomainError(DOMAIN_ERRORS.UNSUPPORTED_CURRENCY);
+    const observe = PROCESSING_DURATION.startTimer({ operation: 'open_wallet' });
     try {
       const wallet = await withTransaction(this.dataSource, this.config, async (manager) => {
         const at = new Date();
@@ -99,12 +101,15 @@ export class OpenWalletUseCase {
         );
         return wallet;
       });
+      if (wallet.balance.isPositive()) OUTCOME_COUNT.inc({ status: 'PROCESSED' });
       writeLog('wallet_opened', { correlationId: context.correlationId, walletId: wallet.id });
       return wallet;
     } catch (error) {
       if (isUniqueViolation(error, 'wallets_player_id_currency_key'))
         throw new ApplicationError(APPLICATION_ERRORS.WALLET_CONFLICT);
       throw error;
+    } finally {
+      observe();
     }
   }
 }

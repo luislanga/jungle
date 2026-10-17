@@ -1,3 +1,4 @@
+import { RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { safeErrorContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { readMessagingConfig, type MessagingConfig } from '@/config/messaging';
@@ -85,6 +86,7 @@ export class SqsWagerConsumer {
         this.active.delete(receipt);
       }
     } catch (error) {
+      RETRY_COUNT.inc({ source: 'sqs' });
       const count = Number(message.Attributes?.ApproximateReceiveCount ?? '1');
       const receiveCount = Number.isSafeInteger(count) && count > 0 ? count : 1;
       writeLog(

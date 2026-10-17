@@ -1,3 +1,4 @@
+import { RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import type { DataSource } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
 import {
@@ -39,6 +40,12 @@ export class PendingReferenceResolver {
         }),
       ),
     );
+    const deferred = results.filter(
+      (result) =>
+        result.status === 'fulfilled' &&
+        result.value.status === WagerTransactionStatus.PendingReference,
+    ).length;
+    RETRY_COUNT.inc({ source: 'pending_reference' }, deferred);
     return {
       claimed: claims.length,
       completed: results.filter(
@@ -46,11 +53,7 @@ export class PendingReferenceResolver {
           result.status === 'fulfilled' &&
           result.value.status !== WagerTransactionStatus.PendingReference,
       ).length,
-      deferred: results.filter(
-        (result) =>
-          result.status === 'fulfilled' &&
-          result.value.status === WagerTransactionStatus.PendingReference,
-      ).length,
+      deferred,
       failed: results.filter((result) => result.status === 'rejected').length,
     };
   }

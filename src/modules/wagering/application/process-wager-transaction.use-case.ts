@@ -1,3 +1,8 @@
+import {
+  PROCESSING_DURATION,
+  recordWagerResult,
+  OUTCOME_COUNT,
+} from '@/shared/infrastructure/metrics/metrics';
 import { writeLog } from '@/shared/infrastructure/logging/application.logger';
 import type { DataSource, EntityManager } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
@@ -50,68 +55,74 @@ export class ProcessWagerTransactionUseCase {
     command: WagerCommand,
     context: WagerProcessingContext,
   ): Promise<WagerProcessingResult> {
-    // HTTP and SQS enter the same transaction. Every write uses this manager, including
-    // Inbox and Outbox; a failed commit must not leave a debit or event behind.
-    const result = await withTransaction(this.dataSource, this.config, async (manager) => {
-      const wagers = new WagerTransactionRepository(manager);
-      let stored = await wagers.findByKey(command.idempotencyKey, true);
-      let created = false;
-      if (!stored) {
-        const wallet = await new WalletRepository(manager).findById(command.data.walletId);
-        if (!wallet) throw new ApplicationError(APPLICATION_ERRORS.WALLET_NOT_FOUND);
-        if (
-          wallet.playerId !== command.data.playerId ||
-          wallet.currency !== command.data.money.currency
-        ) {
-          throw new ApplicationError(APPLICATION_ERRORS.INVALID_WALLET_CONTEXT);
+    const observe = PROCESSING_DURATION.startTimer({ operation: 'submit' });
+    try {
+      // HTTP and SQS enter the same transaction. Every write uses this manager, including
+      // Inbox and Outbox; a failed commit must not leave a debit or event behind.
+      const result = await withTransaction(this.dataSource, this.config, async (manager) => {
+        const wagers = new WagerTransactionRepository(manager);
+        let stored = await wagers.findByKey(command.idempotencyKey, true);
+        let created = false;
+        if (!stored) {
+          const wallet = await new WalletRepository(manager).findById(command.data.walletId);
+          if (!wallet) throw new ApplicationError(APPLICATION_ERRORS.WALLET_NOT_FOUND);
+          if (
+            wallet.playerId !== command.data.playerId ||
+            wallet.currency !== command.data.money.currency
+          ) {
+            throw new ApplicationError(APPLICATION_ERRORS.INVALID_WALLET_CONTEXT);
+          }
+          const { referenceExternalTransactionId, ...businessData } = command.data;
+          const transaction = WagerTransaction.create({
+            ...businessData,
+            ...(referenceExternalTransactionId === undefined
+              ? {}
+              : { referenceExternalTransactionId }),
+            id: crypto.randomUUID(),
+            idempotencyKey: command.idempotencyKey,
+            payloadHash: command.payloadHash,
+            money: Money.from(command.data.money),
+          });
+          await wagers.insertIfAbsent(transaction);
+          stored = await wagers.findByKey(command.idempotencyKey, true);
+          if (!stored) throw new ApplicationError(APPLICATION_ERRORS.EXTERNAL_TRANSACTION_CONFLICT);
+          created = stored.transaction.id === transaction.id;
         }
-        const { referenceExternalTransactionId, ...businessData } = command.data;
-        const transaction = WagerTransaction.create({
-          ...businessData,
-          ...(referenceExternalTransactionId === undefined
-            ? {}
-            : { referenceExternalTransactionId }),
-          id: crypto.randomUUID(),
-          idempotencyKey: command.idempotencyKey,
-          payloadHash: command.payloadHash,
-          money: Money.from(command.data.money),
-        });
-        await wagers.insertIfAbsent(transaction);
-        stored = await wagers.findByKey(command.idempotencyKey, true);
-        if (!stored) throw new ApplicationError(APPLICATION_ERRORS.EXTERNAL_TRANSACTION_CONFLICT);
-        created = stored.transaction.id === transaction.id;
-      }
-      if (!stored.transaction.matchesPayload(command.payloadHash))
-        throw new ApplicationError(APPLICATION_ERRORS.IDEMPOTENCY_CONFLICT);
-      const inbox = context.inbox
-        ? await new InboxMessageRepository(manager).receive(
-            InboxMessage.receive({ ...context.inbox, payloadHash: command.payloadHash }),
-          )
-        : undefined;
-      if (!created) {
+        if (!stored.transaction.matchesPayload(command.payloadHash))
+          throw new ApplicationError(APPLICATION_ERRORS.IDEMPOTENCY_CONFLICT);
+        const inbox = context.inbox
+          ? await new InboxMessageRepository(manager).receive(
+              InboxMessage.receive({ ...context.inbox, payloadHash: command.payloadHash }),
+            )
+          : undefined;
+        if (!created) {
+          if (inbox) {
+            inbox.markProcessed(new Date());
+            await new InboxMessageRepository(manager).save(inbox);
+          }
+          return this.result(stored, true);
+        }
+        const result = await this.apply(manager, stored.transaction, context);
         if (inbox) {
           inbox.markProcessed(new Date());
           await new InboxMessageRepository(manager).save(inbox);
         }
-        return this.result(stored, true);
-      }
-      const result = await this.apply(manager, stored.transaction, context);
-      if (inbox) {
-        inbox.markProcessed(new Date());
-        await new InboxMessageRepository(manager).save(inbox);
-      }
+        return result;
+      });
+      recordWagerResult(result);
+      writeLog(result.idempotentReplay ? 'wager_replayed' : 'wager_outcome', {
+        ...context,
+        transactionId: result.transactionId,
+        walletId: command.data.walletId,
+        providerId: command.data.providerId,
+        messageId: context.inbox?.messageId,
+        status: result.status,
+        failureCode: result.failureCode,
+      });
       return result;
-    });
-    writeLog(result.idempotentReplay ? 'wager_replayed' : 'wager_outcome', {
-      ...context,
-      transactionId: result.transactionId,
-      walletId: command.data.walletId,
-      providerId: command.data.providerId,
-      messageId: context.inbox?.messageId,
-      status: result.status,
-      failureCode: result.failureCode,
-    });
-    return result;
+    } finally {
+      observe();
+    }
   }
 
   async resume(
@@ -119,50 +130,57 @@ export class ProcessWagerTransactionUseCase {
     token: string,
     context: WagerProcessingContext,
   ): Promise<WagerProcessingResult> {
-    // The resolver claims work in a separate, committed transaction, then follows
-    // the same business-row -> wallet lock order as normal ingress.
-    const outcome = await withTransaction(this.dataSource, this.config, async (manager) => {
-      const stored = await new WagerTransactionRepository(manager).findById(transactionId, true);
-      if (!stored) throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
-      const work = new PendingReferenceWorkRepository(manager);
-      const claim = await work.findClaim(transactionId, token);
-      if (!claim || stored.transaction.status !== WagerTransactionStatus.PendingReference)
-        throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
-      // Demo TTL and evaluation limits are independent and configurable. Production
-      // settings must account for provider delays and the incident recovery window.
-      const expired =
-        claim.expiresAt.getTime() <= Date.now() ||
-        claim.attempts + 1 >= this.pendingConfig.PENDING_REFERENCE_MAX_ATTEMPTS;
-      const result = await this.apply(
-        manager,
-        stored.transaction,
-        context,
-        expired
-      );
-      const valid =
-        result.status === WagerTransactionStatus.PendingReference
-          ? await work.scheduleRetry(
-              transactionId,
-              token,
-              nextReferenceAttempt(new Date(), claim.attempts + 1, this.pendingConfig),
-            )
-          : await work.complete(transactionId, token);
-      if (!valid) throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
-      return {
-        result,
-        walletId: stored.transaction.walletId,
-        providerId: stored.transaction.providerId,
-      };
-    });
-    writeLog('wager_reference_resumed', {
-      ...context,
-      transactionId,
-      walletId: outcome.walletId,
-      providerId: outcome.providerId,
-      status: outcome.result.status,
-      failureCode: outcome.result.failureCode,
-    });
-    return outcome.result;
+    const observe = PROCESSING_DURATION.startTimer({ operation: 'resume' });
+    try {
+      // The resolver claims work in a separate, committed transaction, then follows
+      // the same business-row -> wallet lock order as normal ingress.
+      const outcome = await withTransaction(this.dataSource, this.config, async (manager) => {
+        const stored = await new WagerTransactionRepository(manager).findById(transactionId, true);
+        if (!stored) throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
+        const work = new PendingReferenceWorkRepository(manager);
+        const claim = await work.findClaim(transactionId, token);
+        if (!claim || stored.transaction.status !== WagerTransactionStatus.PendingReference)
+          throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
+        // Demo TTL and evaluation limits are independent and configurable. Production
+        // settings must account for provider delays and the incident recovery window.
+        const expired =
+          claim.expiresAt.getTime() <= Date.now() ||
+          claim.attempts + 1 >= this.pendingConfig.PENDING_REFERENCE_MAX_ATTEMPTS;
+        const result = await this.apply(
+          manager,
+          stored.transaction,
+          context,
+          expired
+        );
+        const valid =
+          result.status === WagerTransactionStatus.PendingReference
+            ? await work.scheduleRetry(
+                transactionId,
+                token,
+                nextReferenceAttempt(new Date(), claim.attempts + 1, this.pendingConfig),
+              )
+            : await work.complete(transactionId, token);
+        if (!valid) throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
+        return {
+          result,
+          walletId: stored.transaction.walletId,
+          providerId: stored.transaction.providerId,
+        };
+      });
+      if (outcome.result.status !== WagerTransactionStatus.PendingReference)
+        OUTCOME_COUNT.inc({ status: outcome.result.status });
+      writeLog('wager_reference_resumed', {
+        ...context,
+        transactionId,
+        walletId: outcome.walletId,
+        providerId: outcome.providerId,
+        status: outcome.result.status,
+        failureCode: outcome.result.failureCode,
+      });
+      return outcome.result;
+    } finally {
+      observe();
+    }
   }
 
   private result(stored: StoredWager, replay: boolean): WagerProcessingResult {

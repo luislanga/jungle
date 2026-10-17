@@ -1,3 +1,4 @@
+import { HealthModule } from '@/modules/health/health.module';
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { MessagingModule } from '@/modules/messaging/messaging.module';
@@ -8,7 +9,7 @@ import { HttpErrorFilter } from '@/shared/presentation/http-error.filter';
 import { CorrelationMiddleware } from '@/shared/presentation/correlation.middleware';
 
 @Module({
-  imports: [DatabaseModule, WalletModule, WageringModule, MessagingModule],
+  imports: [DatabaseModule, WalletModule, WageringModule, MessagingModule, HealthModule],
   providers: [{ provide: APP_FILTER, useClass: HttpErrorFilter }],
 })
 export class AppModule implements NestModule {

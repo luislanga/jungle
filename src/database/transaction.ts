@@ -1,3 +1,4 @@
+import { LOCK_CONFLICT_COUNT, RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { DataSource, type EntityManager, QueryFailedError } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
 import { isRetryablePostgresError } from '@/shared/utils/postgres.util';
@@ -27,11 +28,17 @@ export async function withTransaction<Result>(
       });
     } catch (error) {
       const cause: unknown = error instanceof QueryFailedError ? error.driverError : error;
+      const retryable = isRetryablePostgresError(cause);
       if (
-        attempt === settings.DATABASE_TRANSACTION_MAX_ATTEMPTS ||
-        !isRetryablePostgresError(cause)
+        retryable &&
+        typeof cause === 'object' &&
+        cause !== null &&
+        'code' in cause &&
+        cause.code !== '40001'
       )
-        throw error;
+        LOCK_CONFLICT_COUNT.inc();
+      if (attempt === settings.DATABASE_TRANSACTION_MAX_ATTEMPTS || !retryable) throw error;
+      RETRY_COUNT.inc({ source: 'database' });
       const delay = Math.min(
         settings.DATABASE_RETRY_MAX_DELAY_MS,
         settings.DATABASE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),

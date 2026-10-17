@@ -1,3 +1,4 @@
+import { RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { eventLogContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
 import type { DataSource } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
@@ -52,6 +53,7 @@ export class OutboxPublisher {
       if (published) writeLog('outbox_published', eventLogContext(message.payload));
       return published;
     } catch {
+      RETRY_COUNT.inc({ source: 'outbox' });
       message.scheduleRetry(
         new Date(),
         this.config.OUTBOX_RETRY_BASE_MS,
