@@ -2,6 +2,7 @@ name: wagering
 
 x-app: &app
   build: .
+  stop_grace_period: 30s
   environment:
     PORT: 3000
     DATABASE_URL: postgresql://wager_app:${APP_DATABASE_PASSWORD:-local-app}@postgres:5432/wagering

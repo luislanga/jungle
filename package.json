@@ -29,6 +29,9 @@
     "migration:up": "docker compose run --rm migrations update",
     "migration:down": "docker compose run --rm migrations rollback-count --count=1",
     "migration:status": "docker compose run --rm migrations status --verbose",
+    "infra:up": "docker compose up --detach --wait postgres && docker compose run --rm queue-init",
+    "queue:init": "docker compose run --rm queue-init",
+    "app:up": "docker compose up --build app app2 app3",
     "dev:up": "docker compose up --build",
     "dev:down": "docker compose down"
   },
