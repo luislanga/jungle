@@ -15,6 +15,19 @@ export const DOMAIN_ERRORS = {
     code: 'CURRENCY_MISMATCH',
     message: 'Money currencies must match',
   },
+  INVALID_LEDGER_ENTRY: {
+    code: 'INVALID_LEDGER_ENTRY',
+    message: 'Ledger movement must be positive and match the before/after balances',
+  },
+  INVALID_INITIAL_BALANCE: {
+    code: 'INVALID_AMOUNT',
+    message: 'Initial balance cannot be negative',
+  },
+  INSUFFICIENT_FUNDS: { code: 'INSUFFICIENT_FUNDS', message: 'Wallet has insufficient funds' },
+  INVALID_WALLET_MOVEMENT: {
+    code: 'INVALID_AMOUNT',
+    message: 'Wallet movements cannot be negative',
+  },
 } as const;
 
 export type DomainErrorDefinition = (typeof DOMAIN_ERRORS)[keyof typeof DOMAIN_ERRORS];
