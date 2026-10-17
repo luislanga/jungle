@@ -16,7 +16,7 @@ export class WagerTransactionRepository {
       .where('wager.id = :id', { id });
     if (lock) {
       requireTransaction(this.manager);
-      query.setLock('pessimistic_write');
+      query.setLock('for_no_key_update');
     }
     const row = await query.getOne();
     return row ? WagerTransactionMapper.toStored(row) : null;
@@ -28,7 +28,7 @@ export class WagerTransactionRepository {
       .where('wager.idempotency_key = :idempotencyKey', { idempotencyKey });
     if (lock) {
       requireTransaction(this.manager);
-      query.setLock('pessimistic_write');
+      query.setLock('for_no_key_update');
     }
     const row = await query.getOne();
     return row ? WagerTransactionMapper.toStored(row) : null;
@@ -54,6 +54,17 @@ export class WagerTransactionRepository {
     await this.manager
       .getRepository(WagerTransactionEntity)
       .insert(WagerTransactionMapper.toPersistence(tx, resultBalance));
+  }
+  async insertIfAbsent(tx: WagerTransaction): Promise<void> {
+    requireTransaction(this.manager);
+    // A uniqueness race must not abort the transaction before we inspect the winner.
+    await this.manager
+      .getRepository(WagerTransactionEntity)
+      .createQueryBuilder()
+      .insert()
+      .values(WagerTransactionMapper.toPersistence(tx, null))
+      .orIgnore()
+      .execute();
   }
   async save(tx: WagerTransaction, resultBalance: Money): Promise<void> {
     requireTransaction(this.manager);

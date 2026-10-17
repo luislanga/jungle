@@ -1,9 +1,12 @@
 import type { OutboxMessage } from '@/modules/messaging/domain/outbox-message.domain';
 import type { EventEnvelope } from '@/shared/interfaces/event.interface';
 
-export interface InboxState {
-  messageId: string;
+export interface InboxIdentity {
   consumerName: string;
+  messageId: string;
+}
+
+export interface InboxState extends InboxIdentity {
   payloadHash: string;
   receivedAt: Date;
   processedAt?: Date;

@@ -20,6 +20,7 @@ export enum ReferenceValidationStatus {
 }
 
 export enum FailureCode {
+  MoneyOverflow = 'MONEY_OVERFLOW',
   InsufficientFunds = 'INSUFFICIENT_FUNDS',
   ReversalInsufficientFunds = 'REVERSAL_INSUFFICIENT_FUNDS',
   CurrencyMismatch = 'CURRENCY_MISMATCH',

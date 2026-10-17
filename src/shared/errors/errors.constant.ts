@@ -1,4 +1,8 @@
 export const DOMAIN_ERRORS = {
+  REFERENCE_NOT_FOUND_EXPIRED: {
+    code: 'REFERENCE_NOT_FOUND_EXPIRED',
+    message: 'Reference was not resolved within the configured retry window',
+  },
   UNSUPPORTED_CURRENCY: {
     code: 'UNSUPPORTED_CURRENCY',
     message: 'This deployment accepts BRL only',
@@ -113,6 +117,20 @@ export const DOMAIN_ERRORS = {
 export type DomainErrorDefinition = (typeof DOMAIN_ERRORS)[keyof typeof DOMAIN_ERRORS];
 
 export const APPLICATION_ERRORS = {
+  WALLET_NOT_FOUND: { code: 'WALLET_NOT_FOUND', message: 'Wallet was not found' },
+  INVALID_WALLET_CONTEXT: {
+    code: 'INVALID_WALLET_CONTEXT',
+    message: 'Player or currency does not match the wallet',
+  },
+  IDEMPOTENCY_CONFLICT: {
+    code: 'IDEMPOTENCY_CONFLICT',
+    message: 'Idempotency key was reused with different business data',
+  },
+  EXTERNAL_TRANSACTION_CONFLICT: {
+    code: 'EXTERNAL_TRANSACTION_CONFLICT',
+    message: 'Provider transaction already exists with a different idempotency key',
+  },
+  STALE_CLAIM: { code: 'STALE_CLAIM', message: 'The work claim expired or was replaced' },
   WALLET_CONFLICT: {
     code: 'WALLET_CONFLICT',
     message: 'A wallet already exists for this player and currency',

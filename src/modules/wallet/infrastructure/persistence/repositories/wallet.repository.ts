@@ -13,7 +13,9 @@ export class WalletRepository {
       .where('wallet.id = :id', { id });
     if (lock) {
       requireTransaction(this.manager);
-      query.setLock('pessimistic_write');
+      // Balance writers exclude each other, while foreign-key checks can still take KEY SHARE.
+      // Wallet identity columns are immutable, so we never need to update their keys.
+      query.setLock('for_no_key_update');
     }
     const row = await query.getOne();
     return row ? WalletMapper.toDomain(row) : null;
