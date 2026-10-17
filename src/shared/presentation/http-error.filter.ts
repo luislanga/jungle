@@ -1,3 +1,4 @@
+import { safeErrorContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
 import {
   Catch,
   HttpException,
@@ -56,6 +57,16 @@ export class HttpErrorFilter implements ExceptionFilter {
     // Database errors may contain SQL and credentials. Return a stable retry contract, never the driver error.
     const correlationId =
       http.getRequest<{ correlationId?: string }>().correlationId ?? crypto.randomUUID();
+    writeLog(
+      'http_request_failed',
+      {
+        ...safeErrorContext(error),
+        correlationId,
+        failureCode: code,
+        httpStatus: status,
+      },
+      status >= 500 ? 'error' : 'warn',
+    );
     this.adapterHost.httpAdapter.reply(
       http.getResponse<unknown>(),
       { code, message, correlationId },

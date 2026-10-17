@@ -1,3 +1,4 @@
+import { safeErrorContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { readMessagingConfig, type MessagingConfig } from '@/config/messaging';
 import {
@@ -51,18 +52,12 @@ export class SqsWagerConsumer {
       const extension = this.keepVisible(queueUrl, receipt, heartbeat.signal).catch(
         (error: unknown) => {
           if (!heartbeat.signal.aborted)
-            process.stderr.write(
-              JSON.stringify({
-                level: 'warn',
-                event: 'sqs_heartbeat_failed',
-                errorType: error instanceof Error ? error.name : 'UnknownError',
-              }) + '\n',
-            );
+            writeLog('sqs_heartbeat_failed', safeErrorContext(error), 'warn');
         },
       );
       try {
         envelope = parseSqsWager(JSON.parse(message.Body) as unknown);
-        await this.processWager.execute(envelope.command, {
+        const result = await this.processWager.execute(envelope.command, {
           correlationId: envelope.messageId,
           causationId: envelope.messageId,
           // The envelope ID survives republishing; SQS MessageId identifies only one delivery.
@@ -75,6 +70,15 @@ export class SqsWagerConsumer {
         // SQL has committed, including rejected and durably pending outcomes.
         // A failed DeleteMessage can redeliver, so its durable Inbox remains authoritative.
         await this.sqs.delete(queueUrl, message.ReceiptHandle);
+        writeLog('sqs_acknowledged', {
+          messageId: envelope.messageId,
+          sqsMessageId: message.MessageId,
+          correlationId: envelope.messageId,
+          transactionId: result.transactionId,
+          walletId: envelope.command.data.walletId,
+          providerId: envelope.command.data.providerId,
+          status: result.status,
+        });
       } finally {
         heartbeat.abort();
         await extension;
@@ -83,12 +87,11 @@ export class SqsWagerConsumer {
     } catch (error) {
       const count = Number(message.Attributes?.ApproximateReceiveCount ?? '1');
       const receiveCount = Number.isSafeInteger(count) && count > 0 ? count : 1;
-      process.stderr.write(
-        JSON.stringify({
-          level: 'warn',
-          event: 'sqs_delivery_failed',
-          classification: deliveryFailureKind(error),
-          errorType: error instanceof Error ? error.name : 'UnknownError',
+      writeLog(
+        'sqs_delivery_failed',
+        {
+          ...safeErrorContext(error),
+          status: deliveryFailureKind(error),
           receiveCount,
           sqsMessageId: message.MessageId,
           ...(envelope
@@ -99,7 +102,8 @@ export class SqsWagerConsumer {
                 providerId: envelope.command.data.providerId,
               }
             : {}),
-        }) + '\n',
+        },
+        'warn',
       );
       if (message.ReceiptHandle) {
         try {

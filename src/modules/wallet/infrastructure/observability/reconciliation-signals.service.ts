@@ -1,3 +1,4 @@
+import { writeLog } from '@/shared/infrastructure/logging/application.logger';
 import type { ReconciliationResult } from '@/shared/interfaces/wallet.interface';
 import type { EventContext } from '@/shared/interfaces/event.interface';
 
@@ -12,14 +13,14 @@ export class ReconciliationSignals {
 
   recordDiscrepancy(result: ReconciliationResult, context: EventContext): void {
     this.discrepancies++;
-    process.stdout.write(
-      JSON.stringify({
-        level: 'error',
-        event: 'wallet_reconciliation_discrepancy',
+    writeLog(
+      'wallet_reconciliation_discrepancy',
+      {
         correlationId: context.correlationId,
         walletId: result.walletId,
         checkedEntries: result.checkedEntries,
-      }) + '\n',
+      },
+      'error',
     );
   }
 }

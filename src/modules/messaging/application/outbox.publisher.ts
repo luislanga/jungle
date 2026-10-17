@@ -1,3 +1,4 @@
+import { eventLogContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
 import type { DataSource } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
 import { readOutboxConfig, type OutboxConfig } from '@/config/outbox';
@@ -45,9 +46,11 @@ export class OutboxPublisher {
       );
       // If a lease expired during the send, this token cannot mark a newer owner's
       // claim as complete. The stable eventId makes a later duplicate safe to deduplicate.
-      return await withTransaction(this.dataSource, this.databaseConfig, (manager) =>
+      const published = await withTransaction(this.dataSource, this.databaseConfig, (manager) =>
         new OutboxMessageRepository(manager).markPublished(message.id, token),
       );
+      if (published) writeLog('outbox_published', eventLogContext(message.payload));
+      return published;
     } catch {
       message.scheduleRetry(
         new Date(),
@@ -63,15 +66,10 @@ export class OutboxPublisher {
       );
       // Confirmed events must never be dropped after a retry cap. Escalate after the
       // configured threshold and keep recoverable work retrying at the capped delay.
-      process.stderr.write(
-        JSON.stringify({
-          level: message.attempts >= this.config.OUTBOX_ESCALATE_AFTER_ATTEMPTS ? 'error' : 'warn',
-          event: 'outbox_publish_retry',
-          correlationId: message.payload.correlationId,
-          eventId: message.id,
-          walletId: message.aggregateId,
-          attempts: message.attempts,
-        }) + '\n',
+      writeLog(
+        'outbox_publish_retry',
+        { ...eventLogContext(message.payload), attempts: message.attempts },
+        message.attempts >= this.config.OUTBOX_ESCALATE_AFTER_ATTEMPTS ? 'error' : 'warn',
       );
       return false;
     }

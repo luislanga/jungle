@@ -5,6 +5,7 @@ import {
   OPENING_IDEMPOTENCY_PREFIX,
 } from '@/shared/consts/wager.constant';
 import { isAllowedCurrency } from '@/shared/utils/money.util';
+import { writeLog } from '@/shared/infrastructure/logging/application.logger';
 import type { DataSource } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
 import { withTransaction } from '@/database/transaction';
@@ -39,16 +40,12 @@ export class OpenWalletUseCase {
   async execute(input: OpenWalletInput, context: EventContext): Promise<Wallet> {
     if (!isAllowedCurrency(input.initialBalance.currency))
       throw new DomainError(DOMAIN_ERRORS.UNSUPPORTED_CURRENCY);
-
     try {
-      return await withTransaction(this.dataSource, this.config, async (manager) => {
+      const wallet = await withTransaction(this.dataSource, this.config, async (manager) => {
         const at = new Date();
         const wallet = Wallet.open({ ...input, id: crypto.randomUUID() }, at);
-
         await new WalletRepository(manager).insert(wallet);
-
         if (wallet.balance.isZero()) return wallet;
-
         const id = crypto.randomUUID();
         const transaction = WagerTransaction.opening(
           {
@@ -68,9 +65,7 @@ export class OpenWalletUseCase {
           },
           at,
         );
-
         transaction.markProcessed(undefined, at);
-
         const entry = WalletLedgerEntry.create({
           id: crypto.randomUUID(),
           walletId: wallet.id,
@@ -81,12 +76,9 @@ export class OpenWalletUseCase {
           balanceAfter: wallet.balance,
           createdAt: at,
         });
-
         await new WagerTransactionRepository(manager).insert(transaction, wallet.balance);
         await new WalletLedgerEntryRepository(manager).insert(entry);
-
         const outbox = new OutboxMessageRepository(manager);
-
         await outbox.enqueue(
           OutboxMessage.enqueue(
             WagerTransactionProcessed.from(transaction, wallet.balance, {
@@ -96,7 +88,6 @@ export class OpenWalletUseCase {
             }),
           ),
         );
-
         await outbox.enqueue(
           OutboxMessage.enqueue(
             WalletBalanceChanged.from(wallet, entry, {
@@ -108,6 +99,8 @@ export class OpenWalletUseCase {
         );
         return wallet;
       });
+      writeLog('wallet_opened', { correlationId: context.correlationId, walletId: wallet.id });
+      return wallet;
     } catch (error) {
       if (isUniqueViolation(error, 'wallets_player_id_currency_key'))
         throw new ApplicationError(APPLICATION_ERRORS.WALLET_CONFLICT);
