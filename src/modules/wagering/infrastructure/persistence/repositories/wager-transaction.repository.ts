@@ -56,32 +56,32 @@ export class WagerTransactionRepository {
     return rows.map((row) => row.kind as WagerTransactionKind);
   }
 
-  async insert(tx: WagerTransaction, resultBalance: Money | null = null): Promise<void> {
+  async insert(transaction: WagerTransaction, resultBalance: Money | null = null): Promise<void> {
     requireTransaction(this.manager);
     await this.manager
       .getRepository(WagerTransactionEntity)
-      .insert(WagerTransactionMapper.toPersistence(tx, resultBalance));
+      .insert(WagerTransactionMapper.toPersistence(transaction, resultBalance));
   }
 
-  async insertIfAbsent(tx: WagerTransaction): Promise<void> {
+  async insertIfAbsent(transaction: WagerTransaction): Promise<void> {
     requireTransaction(this.manager);
     // A uniqueness race must not abort the transaction before we inspect the winner.
     await this.manager
       .getRepository(WagerTransactionEntity)
       .createQueryBuilder()
       .insert()
-      .values(WagerTransactionMapper.toPersistence(tx, null))
+      .values(WagerTransactionMapper.toPersistence(transaction, null))
       .orIgnore()
       .execute();
   }
 
-  async save(tx: WagerTransaction, resultBalance: Money): Promise<void> {
+  async save(transaction: WagerTransaction, resultBalance: Money): Promise<void> {
     requireTransaction(this.manager);
-    await this.manager.getRepository(WagerTransactionEntity).update(tx.id, {
-      status: tx.status,
-      referenceTransactionId: tx.referenceTransactionId ?? null,
-      failureCode: tx.failureCode ?? null,
-      processedAt: tx.processedAt ?? null,
+    await this.manager.getRepository(WagerTransactionEntity).update(transaction.id, {
+      status: transaction.status,
+      referenceTransactionId: transaction.referenceTransactionId ?? null,
+      failureCode: transaction.failureCode ?? null,
+      processedAt: transaction.processedAt ?? null,
       resultBalance: resultBalance.toString(),
     });
   }

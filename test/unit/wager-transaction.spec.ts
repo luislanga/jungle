@@ -226,23 +226,23 @@ test.each([Status.Pending, Status.PendingReference])(
   '%s can enter every terminal state, which then rejects every transition',
   (status) => {
     for (const terminal of [Status.Processed, Status.Rejected, Status.Failed]) {
-      const tx = WagerTransaction.rehydrate({
+      const transaction = WagerTransaction.rehydrate({
         ...props(),
         createdAt: new Date(),
         status,
       });
-      const id = tx.id;
-      tx.markPendingReference();
-      if (terminal === Status.Processed) tx.markProcessed(undefined, new Date());
-      if (terminal === Status.Rejected) tx.reject(FailureCode.InsufficientFunds);
-      if (terminal === Status.Failed) tx.fail(FailureCode.PermanentProcessingFailure);
-      expect(tx.status).toBe(terminal);
-      expect(tx.id).toBe(id);
+      const id = transaction.id;
+      transaction.markPendingReference();
+      if (terminal === Status.Processed) transaction.markProcessed(undefined, new Date());
+      if (terminal === Status.Rejected) transaction.reject(FailureCode.InsufficientFunds);
+      if (terminal === Status.Failed) transaction.fail(FailureCode.PermanentProcessingFailure);
+      expect(transaction.status).toBe(terminal);
+      expect(transaction.id).toBe(id);
       for (const change of [
-        () => tx.markPendingReference(),
-        () => tx.markProcessed(undefined, new Date()),
-        () => tx.reject(FailureCode.InsufficientFunds),
-        () => tx.fail(FailureCode.PermanentProcessingFailure),
+        () => transaction.markPendingReference(),
+        () => transaction.markProcessed(undefined, new Date()),
+        () => transaction.reject(FailureCode.InsufficientFunds),
+        () => transaction.fail(FailureCode.PermanentProcessingFailure),
       ]) {
         expectCode(change, FailureCode.InvalidTransactionState);
       }
@@ -252,7 +252,7 @@ test.each([Status.Pending, Status.PendingReference])(
 
 test('rehydration preserves state without replay and timestamps cannot be mutated externally', () => {
   const at = new Date('2026-01-01T00:00:00Z');
-  const tx = WagerTransaction.rehydrate({
+  const transaction = WagerTransaction.rehydrate({
     ...props(),
     status: Status.Processed,
     createdAt: at,
@@ -260,11 +260,11 @@ test('rehydration preserves state without replay and timestamps cannot be mutate
     referenceTransactionId: 'ref',
   });
   at.setFullYear(2000);
-  tx.createdAt.setFullYear(2001);
-  tx.processedAt?.setFullYear(2002);
-  expect(tx.createdAt.getUTCFullYear()).toBe(2026);
-  expect(tx.processedAt?.getUTCFullYear()).toBe(2026);
-  expect(tx.referenceTransactionId).toBe('ref');
-  expect(tx.matchesPayload('hash')).toBe(true);
-  expect(tx.matchesPayload('different')).toBe(false);
+  transaction.createdAt.setFullYear(2001);
+  transaction.processedAt?.setFullYear(2002);
+  expect(transaction.createdAt.getUTCFullYear()).toBe(2026);
+  expect(transaction.processedAt?.getUTCFullYear()).toBe(2026);
+  expect(transaction.referenceTransactionId).toBe('ref');
+  expect(transaction.matchesPayload('hash')).toBe(true);
+  expect(transaction.matchesPayload('different')).toBe(false);
 });

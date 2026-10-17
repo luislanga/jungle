@@ -20,7 +20,7 @@ const context = {
   correlationId: 'correlation',
   occurredAt: at,
 };
-function transaction(kind = Kind.Loss) {
+function createTransaction(kind = Kind.Loss) {
   return WagerTransaction.create({
     id: 'tx',
     providerId: 'provider',
@@ -38,9 +38,9 @@ function transaction(kind = Kind.Loss) {
 }
 
 test('processed LOSS has a versioned JSON envelope with exact MoneyProps and no absent causationId', () => {
-  const tx = transaction();
-  tx.markProcessed(undefined, at);
-  const event = WagerTransactionProcessed.from(tx, brl('100'), context);
+  const transaction = createTransaction();
+  transaction.markProcessed(undefined, at);
+  const event = WagerTransactionProcessed.from(transaction, brl('100'), context);
   expect(event.toJSON()).toEqual({
     eventId: 'stable-event',
     eventType: 'WagerTransactionProcessed',
@@ -70,7 +70,7 @@ test('processed LOSS has a versioned JSON envelope with exact MoneyProps and no 
 });
 
 test('rejection and pending-reference event types carry their specific reasons', () => {
-  const rejected = transaction(Kind.Bet);
+  const rejected = createTransaction(Kind.Bet);
   rejected.reject(FailureCode.InsufficientFunds);
   const event = WagerTransactionRejected.from(rejected, brl('0'), {
     ...context,
@@ -79,13 +79,13 @@ test('rejection and pending-reference event types carry their specific reasons',
   expect(event.toJSON().eventType).toBe('WagerTransactionRejected');
   expect(event.toJSON().causationId).toBe('incoming-message');
   expect(event.data.failureCode).toBe(FailureCode.InsufficientFunds);
-  const pending = transaction(Kind.Refund);
+  const pending = createTransaction(Kind.Refund);
   pending.markPendingReference();
   const pendingEvent = WagerTransactionPendingReference.from(pending, context);
   expect(pendingEvent.eventType).toBe('WagerTransactionPendingReference');
   expect(pendingEvent.data.referenceExternalTransactionId).toBe('bet');
   expect(() => WagerTransactionProcessed.from(pending, brl('100'), context)).toThrow();
-  expect(() => WagerTransactionRejected.from(transaction(), brl('100'), context)).toThrow();
+  expect(() => WagerTransactionRejected.from(createTransaction(), brl('100'), context)).toThrow();
 });
 
 test('wallet event represents a real movement and its current version', () => {
@@ -128,9 +128,9 @@ test('wallet event represents a real movement and its current version', () => {
 
 test('event timestamps and signed decimal data remain exact', () => {
   const timestamp = new Date(at);
-  const tx = transaction();
-  tx.markProcessed(undefined, timestamp);
-  const event = WagerTransactionProcessed.from(tx, brl('1').negate(), {
+  const transaction = createTransaction();
+  transaction.markProcessed(undefined, timestamp);
+  const event = WagerTransactionProcessed.from(transaction, brl('1').negate(), {
     ...context,
     occurredAt: timestamp,
   });

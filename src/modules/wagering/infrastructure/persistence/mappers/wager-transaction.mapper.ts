@@ -45,26 +45,29 @@ export class WagerTransactionMapper {
     };
   }
 
-  static toPersistence(tx: WagerTransaction, resultBalance: Money | null): WagerTransactionEntity {
+  static toPersistence(
+    transaction: WagerTransaction,
+    resultBalance: Money | null,
+  ): WagerTransactionEntity {
     return Object.assign(new WagerTransactionEntity(), {
-      id: tx.id,
-      providerId: tx.providerId,
-      externalTransactionId: tx.externalTransactionId,
-      idempotencyKey: tx.idempotencyKey,
-      payloadHash: tx.payloadHash,
-      walletId: tx.walletId,
-      playerId: tx.playerId,
-      roundId: tx.roundId,
-      gameId: tx.gameId,
-      kind: tx.kind,
-      status: tx.status,
-      amount: tx.money.toString(),
-      currency: tx.money.currency,
-      createdAt: tx.createdAt,
-      referenceExternalTransactionId: tx.referenceExternalTransactionId ?? null,
-      referenceTransactionId: tx.referenceTransactionId ?? null,
-      failureCode: tx.failureCode ?? null,
-      processedAt: tx.processedAt ?? null,
+      id: transaction.id,
+      providerId: transaction.providerId,
+      externalTransactionId: transaction.externalTransactionId,
+      idempotencyKey: transaction.idempotencyKey,
+      payloadHash: transaction.payloadHash,
+      walletId: transaction.walletId,
+      playerId: transaction.playerId,
+      roundId: transaction.roundId,
+      gameId: transaction.gameId,
+      kind: transaction.kind,
+      status: transaction.status,
+      amount: transaction.money.toString(),
+      currency: transaction.money.currency,
+      createdAt: transaction.createdAt,
+      referenceExternalTransactionId: transaction.referenceExternalTransactionId ?? null,
+      referenceTransactionId: transaction.referenceTransactionId ?? null,
+      failureCode: transaction.failureCode ?? null,
+      processedAt: transaction.processedAt ?? null,
       resultBalance: resultBalance?.toString() ?? null,
     });
   }

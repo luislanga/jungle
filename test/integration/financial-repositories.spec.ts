@@ -51,7 +51,7 @@ test('mappers preserve every persisted status, nullable fields and original bala
   const w = wallet();
   await db.app.transaction((m) => new WalletRepository(m).insert(w));
   for (const status of Object.values(Status)) {
-    const tx = WagerTransaction.rehydrate({
+    const transaction = WagerTransaction.rehydrate({
       ...props(w, status === Status.PendingReference ? Kind.Refund : Kind.Loss),
       money: brl(status === Status.PendingReference ? '1' : '0'),
       status,
@@ -62,25 +62,25 @@ test('mappers preserve every persisted status, nullable fields and original bala
         ? { failureCode: FailureCode.PermanentProcessingFailure }
         : {}),
     });
-    await db.app.transaction((m) => new WagerTransactionRepository(m).insert(tx, brl()));
+    await db.app.transaction((m) => new WagerTransactionRepository(m).insert(transaction, brl()));
     const stored = await new WagerTransactionRepository(db.app.manager).findByKey(
-      tx.idempotencyKey,
+      transaction.idempotencyKey,
     );
     expect(stored?.transaction.status).toBe(status);
-    expect(stored?.transaction.failureCode).toBe(tx.failureCode);
+    expect(stored?.transaction.failureCode).toBe(transaction.failureCode);
     expect(stored?.transaction.referenceExternalTransactionId).toBe(
-      tx.referenceExternalTransactionId,
+      transaction.referenceExternalTransactionId,
     );
     expect(stored?.resultBalance?.toString()).toBe('0.00');
     expect(
       (
         await new WagerTransactionRepository(db.app.manager).findByExternalId(
-          tx.providerId,
-          tx.externalTransactionId,
+          transaction.providerId,
+          transaction.externalTransactionId,
         )
       )?.transaction.id,
-    ).toBe(tx.id);
-    const row = WagerTransactionMapper.toPersistence(tx, brl());
+    ).toBe(transaction.id);
+    const row = WagerTransactionMapper.toPersistence(transaction, brl());
     expect(
       WagerTransactionMapper.toPersistence(WagerTransactionMapper.toDomain(row), brl()),
     ).toEqual(row);
@@ -99,12 +99,12 @@ test('exact large amounts round-trip through wallet, opening wager and immutable
     playerId: crypto.randomUUID(),
     initialBalance: money,
   });
-  const tx = WagerTransaction.opening({ ...props(w), money });
-  tx.markProcessed(undefined, new Date());
+  const transaction = WagerTransaction.opening({ ...props(w), money });
+  transaction.markProcessed(undefined, new Date());
   const entry = WalletLedgerEntry.create({
     id: crypto.randomUUID(),
     walletId: w.id,
-    transactionId: tx.id,
+    transactionId: transaction.id,
     direction: LedgerDirection.Credit,
     money,
     balanceBefore: brl(),
@@ -113,11 +113,13 @@ test('exact large amounts round-trip through wallet, opening wager and immutable
   });
   await db.app.transaction(async (m) => {
     await new WalletRepository(m).insert(w);
-    await new WagerTransactionRepository(m).insert(tx, money);
+    await new WagerTransactionRepository(m).insert(transaction, money);
     await new WalletLedgerEntryRepository(m).insert(entry);
   });
   const loaded = await new WalletRepository(db.app.manager).findById(w.id);
-  const audit = await new WalletLedgerEntryRepository(db.app.manager).findByTransaction(tx.id);
+  const audit = await new WalletLedgerEntryRepository(db.app.manager).findByTransaction(
+    transaction.id,
+  );
   expect(loaded?.balance.toString()).toBe(money.toString());
   expect(audit?.money.toString()).toBe(money.toString());
   expect(audit?.isBalanced()).toBe(true);

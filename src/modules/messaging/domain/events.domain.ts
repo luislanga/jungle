@@ -25,18 +25,19 @@ function metadata(aggregateId: string, ctx: EventContext) {
     occurredAt: ctx.occurredAt ?? new Date(),
   };
 }
-function transactionData(tx: WagerTransaction): TransactionEventData {
+function transactionData(transaction: WagerTransaction): TransactionEventData {
   return {
-    transactionId: tx.id,
-    providerId: tx.providerId,
-    externalTransactionId: tx.externalTransactionId,
-    walletId: tx.walletId,
-    kind: tx.kind,
-    money: tx.money.toJSON(),
+    transactionId: transaction.id,
+    providerId: transaction.providerId,
+    externalTransactionId: transaction.externalTransactionId,
+    walletId: transaction.walletId,
+    kind: transaction.kind,
+    money: transaction.money.toJSON(),
   };
 }
-function assertStatus(tx: WagerTransaction, status: WagerTransactionStatus): void {
-  if (tx.status !== status) throw new DomainError(DOMAIN_ERRORS.EVENT_TRANSACTION_STATE_MISMATCH);
+function assertStatus(transaction: WagerTransaction, status: WagerTransactionStatus): void {
+  if (transaction.status !== status)
+    throw new DomainError(DOMAIN_ERRORS.EVENT_TRANSACTION_STATE_MISMATCH);
 }
 
 export class WagerTransactionProcessed extends IntegrationEvent<WagerTransactionProcessedData> {
@@ -48,11 +49,15 @@ export class WagerTransactionProcessed extends IntegrationEvent<WagerTransaction
     Object.freeze(this);
   }
 
-  static from(tx: WagerTransaction, balance: Money, ctx: EventContext): WagerTransactionProcessed {
-    assertStatus(tx, WagerTransactionStatus.Processed);
+  static from(
+    transaction: WagerTransaction,
+    balance: Money,
+    ctx: EventContext,
+  ): WagerTransactionProcessed {
+    assertStatus(transaction, WagerTransactionStatus.Processed);
     return new WagerTransactionProcessed({
-      ...metadata(tx.walletId, ctx),
-      data: { ...transactionData(tx), balance: balance.toJSON() },
+      ...metadata(transaction.walletId, ctx),
+      data: { ...transactionData(transaction), balance: balance.toJSON() },
     });
   }
 }
@@ -66,14 +71,18 @@ export class WagerTransactionRejected extends IntegrationEvent<WagerTransactionR
     Object.freeze(this);
   }
 
-  static from(tx: WagerTransaction, balance: Money, ctx: EventContext): WagerTransactionRejected {
-    assertStatus(tx, WagerTransactionStatus.Rejected);
-    if (!tx.failureCode) throw new DomainError(DOMAIN_ERRORS.MISSING_FAILURE_CODE);
+  static from(
+    transaction: WagerTransaction,
+    balance: Money,
+    ctx: EventContext,
+  ): WagerTransactionRejected {
+    assertStatus(transaction, WagerTransactionStatus.Rejected);
+    if (!transaction.failureCode) throw new DomainError(DOMAIN_ERRORS.MISSING_FAILURE_CODE);
     return new WagerTransactionRejected({
-      ...metadata(tx.walletId, ctx),
+      ...metadata(transaction.walletId, ctx),
       data: {
-        ...transactionData(tx),
-        failureCode: tx.failureCode,
+        ...transactionData(transaction),
+        failureCode: transaction.failureCode,
         balance: balance.toJSON(),
       },
     });
@@ -89,15 +98,15 @@ export class WagerTransactionPendingReference extends IntegrationEvent<WagerTran
     Object.freeze(this);
   }
 
-  static from(tx: WagerTransaction, ctx: EventContext): WagerTransactionPendingReference {
-    assertStatus(tx, WagerTransactionStatus.PendingReference);
-    if (!tx.referenceExternalTransactionId)
+  static from(transaction: WagerTransaction, ctx: EventContext): WagerTransactionPendingReference {
+    assertStatus(transaction, WagerTransactionStatus.PendingReference);
+    if (!transaction.referenceExternalTransactionId)
       throw new DomainError(DOMAIN_ERRORS.PENDING_EVENT_REFERENCE_REQUIRED);
     return new WagerTransactionPendingReference({
-      ...metadata(tx.walletId, ctx),
+      ...metadata(transaction.walletId, ctx),
       data: {
-        ...transactionData(tx),
-        referenceExternalTransactionId: tx.referenceExternalTransactionId,
+        ...transactionData(transaction),
+        referenceExternalTransactionId: transaction.referenceExternalTransactionId,
       },
     });
   }

@@ -1,19 +1,8 @@
 import { z } from 'zod';
 import { WagerTransactionKind as Kind } from '@/shared/enums/wager.enum';
-import { Money } from '@/shared/domain/money.domain';
+import { MONEY_INPUT_SCHEMA } from '@/shared/contracts/money.schema';
 
 export const IDEMPOTENCY_KEY_SCHEMA = z.string().min(1);
-const MONEY_SCHEMA = z
-  .strictObject({ amount: z.string(), currency: z.literal('BRL') })
-  .transform((props, ctx) => {
-    try {
-      return Money.from(props).toJSON();
-    } catch {
-      ctx.addIssue({ code: 'custom', message: 'Invalid monetary amount' });
-      return z.NEVER;
-    }
-  });
-
 export const WAGER_BUSINESS_SCHEMA = z
   .strictObject({
     providerId: z.string().min(1),
@@ -23,7 +12,7 @@ export const WAGER_BUSINESS_SCHEMA = z
     roundId: z.string().min(1),
     gameId: z.string().min(1),
     kind: z.enum([Kind.Bet, Kind.Win, Kind.Loss, Kind.Refund, Kind.Rollback]),
-    money: MONEY_SCHEMA,
+    money: MONEY_INPUT_SCHEMA,
     // README §7 allows WIN payloads both with and without a BET reference.
     referenceExternalTransactionId: z.string().min(1).optional(),
   })

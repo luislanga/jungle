@@ -1,3 +1,4 @@
+import { ALLOWED_CURRENCIES } from '@/shared/consts/money.constant';
 export function isValidAmountFormat(value: unknown): value is string {
   // Accept digits with an optional decimal point and one or two decimal places.
   // Signs, scientific notation and additional decimal places are not valid input.
@@ -11,4 +12,8 @@ const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf('currency'));
 
 export function isSupportedCurrency(value: unknown): value is string {
   return typeof value === 'string' && SUPPORTED_CURRENCIES.has(value);
+}
+
+export function isAllowedCurrency(currency: string): boolean {
+  return ALLOWED_CURRENCIES.some((allowedCurrency) => allowedCurrency === currency);
 }

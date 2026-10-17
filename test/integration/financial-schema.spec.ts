@@ -55,18 +55,18 @@ const hash = 'a'.repeat(64);
 async function seed(): Promise<Fixture> {
   const fixture = { wallet: crypto.randomUUID(), player: crypto.randomUUID() };
   await app.transaction(async (manager) => {
-    const tx = crypto.randomUUID();
+    const transactionId = crypto.randomUUID();
     await manager.query(
       "INSERT INTO wagering.wallets(id,player_id,currency,balance) VALUES($1,$2,'BRL',100)",
       [fixture.wallet, fixture.player],
     );
     await manager.query(
       "INSERT INTO wagering.wager_transactions(id,provider_id,external_transaction_id,idempotency_key,payload_hash,wallet_id,player_id,round_id,game_id,kind,amount,currency,status,result_balance,processed_at) VALUES($1::uuid,'internal',$1::text,$1::text,$2,$3,$4,'opening','internal','OPENING',100,'BRL','PROCESSED',100,now())",
-      [tx, hash, fixture.wallet, fixture.player],
+      [transactionId, hash, fixture.wallet, fixture.player],
     );
     await manager.query(
       "INSERT INTO wagering.wallet_ledger_entries(id,wallet_id,transaction_id,direction,amount,currency,balance_before,balance_after) VALUES($1,$2,$3,'CREDIT',100,'BRL',0,100)",
-      [crypto.randomUUID(), fixture.wallet, tx],
+      [crypto.randomUUID(), fixture.wallet, transactionId],
     );
   });
   return fixture;

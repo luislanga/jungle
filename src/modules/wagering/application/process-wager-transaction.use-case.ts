@@ -65,7 +65,7 @@ export class ProcessWagerTransactionUseCase {
           throw new ApplicationError(APPLICATION_ERRORS.INVALID_WALLET_CONTEXT);
         }
         const { referenceExternalTransactionId, ...businessData } = command.data;
-        const tx = WagerTransaction.create({
+        const transaction = WagerTransaction.create({
           ...businessData,
           ...(referenceExternalTransactionId === undefined
             ? {}
@@ -75,10 +75,10 @@ export class ProcessWagerTransactionUseCase {
           payloadHash: command.payloadHash,
           money: Money.from(command.data.money),
         });
-        await wagers.insertIfAbsent(tx);
+        await wagers.insertIfAbsent(transaction);
         stored = await wagers.findByKey(command.idempotencyKey, true);
         if (!stored) throw new ApplicationError(APPLICATION_ERRORS.EXTERNAL_TRANSACTION_CONFLICT);
-        created = stored.transaction.id === tx.id;
+        created = stored.transaction.id === transaction.id;
       }
       if (!stored.transaction.matchesPayload(command.payloadHash))
         throw new ApplicationError(APPLICATION_ERRORS.IDEMPOTENCY_CONFLICT);
@@ -154,20 +154,24 @@ export class ProcessWagerTransactionUseCase {
 
   private async apply(
     manager: EntityManager,
-    tx: WagerTransaction,
+    transaction: WagerTransaction,
     context: WagerProcessingContext,
     expired = false,
   ): Promise<WagerProcessingResult> {
     const wallets = new WalletRepository(manager),
       wagers = new WagerTransactionRepository(manager);
-    const wallet = await wallets.findById(tx.walletId, true);
+    const wallet = await wallets.findById(transaction.walletId, true);
     if (!wallet) throw new ApplicationError(APPLICATION_ERRORS.WALLET_NOT_FOUND);
     const before = wallet.balance,
       at = new Date();
-    const wasPending = tx.status === WagerTransactionStatus.PendingReference;
-    const reference = tx.referenceExternalTransactionId
-      ? (await wagers.findByExternalId(tx.providerId, tx.referenceExternalTransactionId))
-          ?.transaction
+    const wasPending = transaction.status === WagerTransactionStatus.PendingReference;
+    const reference = transaction.referenceExternalTransactionId
+      ? (
+          await wagers.findByExternalId(
+            transaction.providerId,
+            transaction.referenceExternalTransactionId,
+          )
+        )?.transaction
       : undefined;
     let direction: LedgerDirection | undefined;
     let pendingReference = false;
@@ -177,38 +181,39 @@ export class ProcessWagerTransactionUseCase {
       // README 7 accepts WIN both with and without a BET reference. An eligible
       // supplied BET and an unreferenced WIN process now; unavailable references wait.
       pendingReference =
-        tx.validateReference(reference, reversals) === ReferenceValidationStatus.PendingReference;
+        transaction.validateReference(reference, reversals) ===
+        ReferenceValidationStatus.PendingReference;
       if (!pendingReference) {
-        tx.assertSufficientBalance(before, reference);
-        direction = tx.ledgerDirectionFor(reference);
-        if (direction === LedgerDirection.Debit) wallet.debit(tx.money, at);
-        if (direction === LedgerDirection.Credit) wallet.credit(tx.money, at);
+        transaction.assertSufficientBalance(before, reference);
+        direction = transaction.ledgerDirectionFor(reference);
+        if (direction === LedgerDirection.Debit) wallet.debit(transaction.money, at);
+        if (direction === LedgerDirection.Credit) wallet.credit(transaction.money, at);
       }
     } catch (error) {
       if (!(error instanceof DomainError)) throw error;
-      tx.reject(businessFailureCode(error));
+      transaction.reject(businessFailureCode(error));
     }
     let entry: WalletLedgerEntry | undefined;
     if (pendingReference) {
-      tx.markPendingReference();
-    } else if (tx.status !== WagerTransactionStatus.Rejected) {
+      transaction.markPendingReference();
+    } else if (transaction.status !== WagerTransactionStatus.Rejected) {
       // A broken ledger invariant is a programming error: roll back rather than
       // converting it into a rejected wager after changing the in-memory wallet.
       if (direction !== undefined && !wallet.balance.equals(before)) {
         entry = WalletLedgerEntry.create({
           id: crypto.randomUUID(),
           walletId: wallet.id,
-          transactionId: tx.id,
+          transactionId: transaction.id,
           direction,
-          money: tx.money,
+          money: transaction.money,
           balanceBefore: before,
           balanceAfter: wallet.balance,
           createdAt: at,
         });
       }
-      tx.markProcessed(reference?.id, at);
+      transaction.markProcessed(reference?.id, at);
     }
-    await wagers.save(tx, wallet.balance);
+    await wagers.save(transaction, wallet.balance);
     if (entry) {
       await new WalletLedgerEntryRepository(manager).insert(entry);
       await wallets.save(wallet);
@@ -219,23 +224,27 @@ export class ProcessWagerTransactionUseCase {
       occurredAt: at,
       eventId: crypto.randomUUID(),
     };
-    if (tx.status === WagerTransactionStatus.PendingReference && !wasPending) {
+    if (transaction.status === WagerTransactionStatus.PendingReference && !wasPending) {
       await new PendingReferenceWorkRepository(manager).schedule(
-        tx.id,
+        transaction.id,
         new Date(at.getTime() + this.pendingConfig.PENDING_REFERENCE_TTL_MS),
         nextReferenceAttempt(at, 0, this.pendingConfig),
       );
       await outbox.enqueue(
-        OutboxMessage.enqueue(WagerTransactionPendingReference.from(tx, eventContext)),
+        OutboxMessage.enqueue(WagerTransactionPendingReference.from(transaction, eventContext)),
       );
     }
-    if (tx.status === WagerTransactionStatus.Processed)
+    if (transaction.status === WagerTransactionStatus.Processed)
       await outbox.enqueue(
-        OutboxMessage.enqueue(WagerTransactionProcessed.from(tx, wallet.balance, eventContext)),
+        OutboxMessage.enqueue(
+          WagerTransactionProcessed.from(transaction, wallet.balance, eventContext),
+        ),
       );
-    if (tx.status === WagerTransactionStatus.Rejected)
+    if (transaction.status === WagerTransactionStatus.Rejected)
       await outbox.enqueue(
-        OutboxMessage.enqueue(WagerTransactionRejected.from(tx, wallet.balance, eventContext)),
+        OutboxMessage.enqueue(
+          WagerTransactionRejected.from(transaction, wallet.balance, eventContext),
+        ),
       );
     if (entry)
       await outbox.enqueue(
@@ -246,6 +255,6 @@ export class ProcessWagerTransactionUseCase {
           }),
         ),
       );
-    return this.result({ transaction: tx, resultBalance: wallet.balance }, false);
+    return this.result({ transaction: transaction, resultBalance: wallet.balance }, false);
   }
 }

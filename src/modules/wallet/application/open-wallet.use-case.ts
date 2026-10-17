@@ -1,3 +1,10 @@
+import {
+  INTERNAL_PROVIDER_ID,
+  INTERNAL_GAME_ID,
+  OPENING_ROUND_ID,
+  OPENING_IDEMPOTENCY_PREFIX,
+} from '@/shared/consts/wager.constant';
+import { isAllowedCurrency } from '@/shared/utils/money.util';
 import type { DataSource } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
 import { withTransaction } from '@/database/transaction';
@@ -30,60 +37,66 @@ export class OpenWalletUseCase {
   ) {}
 
   async execute(input: OpenWalletInput, context: EventContext): Promise<Wallet> {
-    if (input.initialBalance.currency !== 'BRL')
+    if (!isAllowedCurrency(input.initialBalance.currency))
       throw new DomainError(DOMAIN_ERRORS.UNSUPPORTED_CURRENCY);
+
     try {
-      // PostgreSQL commits the wallet, opening entry and events together. No SQS send happens here.
-      // A CHECK cannot ensure balance equals the ledger total; all these writes must use this manager.
       return await withTransaction(this.dataSource, this.config, async (manager) => {
         const at = new Date();
         const wallet = Wallet.open({ ...input, id: crypto.randomUUID() }, at);
+
         await new WalletRepository(manager).insert(wallet);
-        // README leaves zero opening unspecified. Our approved interpretation creates
-        // an empty wallet without claiming a financial movement or publishing balance events.
+
         if (wallet.balance.isZero()) return wallet;
+
         const id = crypto.randomUUID();
-        const tx = WagerTransaction.opening(
+        const transaction = WagerTransaction.opening(
           {
             id,
-            providerId: 'internal',
+            providerId: INTERNAL_PROVIDER_ID,
             externalTransactionId: id,
-            idempotencyKey: `opening:${wallet.id}`,
+            idempotencyKey: `${OPENING_IDEMPOTENCY_PREFIX}:${wallet.id}`,
             payloadHash: canonicalHash({
               walletId: wallet.id,
               initialBalance: wallet.balance.toJSON(),
             }),
             walletId: wallet.id,
             playerId: wallet.playerId,
-            roundId: 'opening',
-            gameId: 'internal',
+            roundId: OPENING_ROUND_ID,
+            gameId: INTERNAL_GAME_ID,
             money: wallet.balance,
           },
           at,
         );
-        tx.markProcessed(undefined, at);
+
+        transaction.markProcessed(undefined, at);
+
         const entry = WalletLedgerEntry.create({
           id: crypto.randomUUID(),
           walletId: wallet.id,
-          transactionId: tx.id,
+          transactionId: transaction.id,
           direction: LedgerDirection.Credit,
           money: wallet.balance,
           balanceBefore: Money.zero(wallet.currency),
           balanceAfter: wallet.balance,
           createdAt: at,
         });
-        await new WagerTransactionRepository(manager).insert(tx, wallet.balance);
+
+        await new WagerTransactionRepository(manager).insert(transaction, wallet.balance);
         await new WalletLedgerEntryRepository(manager).insert(entry);
+
         const outbox = new OutboxMessageRepository(manager);
+
         await outbox.enqueue(
           OutboxMessage.enqueue(
-            WagerTransactionProcessed.from(tx, wallet.balance, {
+            WagerTransactionProcessed.from(transaction, wallet.balance, {
               ...context,
               eventId: crypto.randomUUID(),
               occurredAt: at,
             }),
           ),
         );
+
         await outbox.enqueue(
           OutboxMessage.enqueue(
             WalletBalanceChanged.from(wallet, entry, {

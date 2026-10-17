@@ -8,7 +8,7 @@ import { Money } from '@/shared/domain/money.domain';
 
 const at = new Date('2026-01-01T00:00:00Z');
 function event() {
-  const tx = WagerTransaction.create({
+  const transaction = WagerTransaction.create({
     id: 'tx',
     providerId: 'provider',
     externalTransactionId: 'external',
@@ -21,8 +21,8 @@ function event() {
     kind: WagerTransactionKind.Loss,
     money: Money.zero('BRL'),
   });
-  tx.markProcessed(undefined, at);
-  return WagerTransactionProcessed.from(tx, Money.zero('BRL'), {
+  transaction.markProcessed(undefined, at);
+  return WagerTransactionProcessed.from(transaction, Money.zero('BRL'), {
     eventId: 'stable-id',
     correlationId: 'correlation',
     occurredAt: at,
