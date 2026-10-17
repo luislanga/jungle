@@ -1,3 +1,4 @@
+import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startPostgresTest } from '@test/support/postgres.util';
 import { OpenWalletUseCase } from '@/modules/wallet/application/open-wallet.use-case';
@@ -8,10 +9,12 @@ let db: Awaited<ReturnType<typeof startPostgresTest>>, useCase: OpenWalletUseCas
 beforeAll(async () => {
   db = await startPostgresTest();
   useCase = new OpenWalletUseCase(
-    db.app,
-    readDatabaseConfig({
-      DATABASE_URL: db.app.options.type === 'postgres' ? db.app.options.url! : '',
-    }),
+    createFinancialTransaction(
+      db.app,
+      readDatabaseConfig({
+        DATABASE_URL: db.app.options.type === 'postgres' ? db.app.options.url! : '',
+      }),
+    ),
   );
 }, 120_000);
 afterAll(async () => {

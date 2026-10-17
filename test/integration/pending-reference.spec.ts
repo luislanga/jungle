@@ -1,3 +1,4 @@
+import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startPostgresTest } from '@test/support/postgres.util';
 import {
@@ -207,7 +208,10 @@ test('configured attempt overrides survive reconstruction of a resolver instance
     PENDING_REFERENCE_RETRY_BASE_MS: '1',
     PENDING_REFERENCE_RETRY_MAX_MS: '1',
   });
-  const service = new ProcessWagerTransactionUseCase(db.app, database, config);
+  const service = new ProcessWagerTransactionUseCase(
+    createFinancialTransaction(db.app, database),
+    config,
+  );
   const pending = await service.execute(
     wagerCommand(wallet, { kind: Kind.Refund, referenceExternalTransactionId: 'missing' }),
     TEST_CONTEXT,

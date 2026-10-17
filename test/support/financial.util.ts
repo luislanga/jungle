@@ -1,3 +1,4 @@
+import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { expect } from 'bun:test';
 import type { DataSource } from 'typeorm';
 import { readDatabaseConfig } from '@/config/database';
@@ -16,8 +17,8 @@ export function financialServices(dataSource: DataSource) {
   const config = readDatabaseConfig({ DATABASE_URL: dataSource.options.url! });
   return {
     config,
-    open: new OpenWalletUseCase(dataSource, config),
-    process: new ProcessWagerTransactionUseCase(dataSource, config),
+    open: new OpenWalletUseCase(createFinancialTransaction(dataSource, config)),
+    process: new ProcessWagerTransactionUseCase(createFinancialTransaction(dataSource, config)),
   };
 }
 

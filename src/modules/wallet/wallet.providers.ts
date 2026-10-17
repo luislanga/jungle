@@ -5,8 +5,8 @@ import { GetWalletUseCase } from '@/modules/wallet/application/get-wallet.use-ca
 import { WalletQueriesAdapter } from '@/modules/wallet/infrastructure/persistence/wallet-queries.adapter';
 import type { Provider } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { DATABASE_CONFIG } from '@/database/database.module';
-import type { DatabaseConfig } from '@/config/database';
+import { FINANCIAL_TRANSACTION } from '@/database/database.module';
+import type { FinancialTransaction } from '@/shared/interfaces/financial-transaction.interface';
 import { OpenWalletUseCase } from '@/modules/wallet/application/open-wallet.use-case';
 import { ChallengeAuthGuard } from '@/shared/presentation/challenge-auth.guard';
 
@@ -33,8 +33,7 @@ export const WALLET_PROVIDERS: Provider[] = [
   },
   {
     provide: OpenWalletUseCase,
-    inject: [DataSource, DATABASE_CONFIG],
-    useFactory: (dataSource: DataSource, config: DatabaseConfig) =>
-      new OpenWalletUseCase(dataSource, config),
+    inject: [FINANCIAL_TRANSACTION],
+    useFactory: (transaction: FinancialTransaction) => new OpenWalletUseCase(transaction),
   },
 ];

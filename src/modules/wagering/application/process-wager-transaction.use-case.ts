@@ -1,16 +1,17 @@
+import type {
+  FinancialTransaction,
+  FinancialRepositories,
+} from '@/shared/interfaces/financial-transaction.interface';
 import {
   PROCESSING_DURATION,
   recordWagerResult,
   OUTCOME_COUNT,
 } from '@/shared/infrastructure/metrics/metrics';
 import { writeLog } from '@/shared/infrastructure/logging/application.logger';
-import type { DataSource, EntityManager } from 'typeorm';
-import type { DatabaseConfig } from '@/config/database';
 import {
   readPendingReferenceConfig,
   type PendingReferenceConfig,
 } from '@/config/pending-reference';
-import { withTransaction } from '@/database/transaction';
 import { WagerTransaction } from '@/modules/wagering/domain/wager-transaction.domain';
 import { WalletLedgerEntry } from '@/modules/wallet/domain/wallet-ledger-entry.domain';
 import { InboxMessage } from '@/modules/messaging/domain/inbox-message.domain';
@@ -21,12 +22,6 @@ import {
   WagerTransactionProcessed,
   WagerTransactionRejected,
 } from '@/modules/messaging/domain/events.domain';
-import { WalletRepository } from '@/modules/wallet/infrastructure/persistence/repositories/wallet.repository';
-import { WalletLedgerEntryRepository } from '@/modules/wallet/infrastructure/persistence/repositories/wallet-ledger-entry.repository';
-import { WagerTransactionRepository } from '@/modules/wagering/infrastructure/persistence/repositories/wager-transaction.repository';
-import { InboxMessageRepository } from '@/modules/messaging/infrastructure/persistence/repositories/inbox-message.repository';
-import { OutboxMessageRepository } from '@/modules/messaging/infrastructure/persistence/repositories/outbox-message.repository';
-import { PendingReferenceWorkRepository } from '@/modules/messaging/infrastructure/persistence/repositories/pending-reference-work.repository';
 import { ReferenceValidationStatus, WagerTransactionStatus } from '@/shared/enums/wager.enum';
 import { LedgerDirection } from '@/shared/enums/wallet.enum';
 import { DomainError } from '@/shared/errors/domain.error';
@@ -46,8 +41,7 @@ import type {
 
 export class ProcessWagerTransactionUseCase {
   constructor(
-    private readonly dataSource: DataSource,
-    private readonly config: DatabaseConfig,
+    private readonly transaction: FinancialTransaction,
     private readonly pendingConfig: PendingReferenceConfig = readPendingReferenceConfig(),
   ) {}
 
@@ -57,14 +51,14 @@ export class ProcessWagerTransactionUseCase {
   ): Promise<WagerProcessingResult> {
     const observe = PROCESSING_DURATION.startTimer({ operation: 'submit' });
     try {
-      // HTTP and SQS enter the same transaction. Every write uses this manager, including
-      // Inbox and Outbox; a failed commit must not leave a debit or event behind.
-      const result = await withTransaction(this.dataSource, this.config, async (manager) => {
-        const wagers = new WagerTransactionRepository(manager);
+      // HTTP and SQS use this same path. These repositories share one database
+      // transaction, so a failed commit leaves no wallet, ledger, Inbox or Outbox changes.
+      const result = await this.transaction(async (repositories) => {
+        const wagers = repositories.wagers;
         let stored = await wagers.findByKey(command.idempotencyKey, true);
         let created = false;
         if (!stored) {
-          const wallet = await new WalletRepository(manager).findById(command.data.walletId);
+          const wallet = await repositories.wallets.findById(command.data.walletId);
           if (!wallet) throw new ApplicationError(APPLICATION_ERRORS.WALLET_NOT_FOUND);
           if (
             wallet.playerId !== command.data.playerId ||
@@ -91,21 +85,21 @@ export class ProcessWagerTransactionUseCase {
         if (!stored.transaction.matchesPayload(command.payloadHash))
           throw new ApplicationError(APPLICATION_ERRORS.IDEMPOTENCY_CONFLICT);
         const inbox = context.inbox
-          ? await new InboxMessageRepository(manager).receive(
+          ? await repositories.inbox.receive(
               InboxMessage.receive({ ...context.inbox, payloadHash: command.payloadHash }),
             )
           : undefined;
         if (!created) {
           if (inbox) {
             inbox.markProcessed(new Date());
-            await new InboxMessageRepository(manager).save(inbox);
+            await repositories.inbox.save(inbox);
           }
           return this.result(stored, true);
         }
-        const result = await this.apply(manager, stored.transaction, context);
+        const result = await this.apply(repositories, stored.transaction, context);
         if (inbox) {
           inbox.markProcessed(new Date());
-          await new InboxMessageRepository(manager).save(inbox);
+          await repositories.inbox.save(inbox);
         }
         return result;
       });
@@ -134,10 +128,10 @@ export class ProcessWagerTransactionUseCase {
     try {
       // The resolver claims work in a separate, committed transaction, then follows
       // the same business-row -> wallet lock order as normal ingress.
-      const outcome = await withTransaction(this.dataSource, this.config, async (manager) => {
-        const stored = await new WagerTransactionRepository(manager).findById(transactionId, true);
+      const outcome = await this.transaction(async (repositories) => {
+        const stored = await repositories.wagers.findById(transactionId, true);
         if (!stored) throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
-        const work = new PendingReferenceWorkRepository(manager);
+        const work = repositories.pending;
         const claim = await work.findClaim(transactionId, token);
         if (!claim || stored.transaction.status !== WagerTransactionStatus.PendingReference)
           throw new ApplicationError(APPLICATION_ERRORS.STALE_CLAIM);
@@ -147,7 +141,7 @@ export class ProcessWagerTransactionUseCase {
           claim.expiresAt.getTime() <= Date.now() ||
           claim.attempts + 1 >= this.pendingConfig.PENDING_REFERENCE_MAX_ATTEMPTS;
         const result = await this.apply(
-          manager,
+          repositories,
           stored.transaction,
           context,
           expired
@@ -195,13 +189,13 @@ export class ProcessWagerTransactionUseCase {
   }
 
   private async apply(
-    manager: EntityManager,
+    repositories: FinancialRepositories,
     transaction: WagerTransaction,
     context: WagerProcessingContext,
     expired = false,
   ): Promise<WagerProcessingResult> {
-    const wallets = new WalletRepository(manager),
-      wagers = new WagerTransactionRepository(manager);
+    const wallets = repositories.wallets,
+      wagers = repositories.wagers;
     const wallet = await wallets.findById(transaction.walletId, true);
     if (!wallet) throw new ApplicationError(APPLICATION_ERRORS.WALLET_NOT_FOUND);
     const before = wallet.balance,
@@ -257,17 +251,17 @@ export class ProcessWagerTransactionUseCase {
     }
     await wagers.save(transaction, wallet.balance);
     if (entry) {
-      await new WalletLedgerEntryRepository(manager).insert(entry);
+      await repositories.ledger.insert(entry);
       await wallets.save(wallet);
     }
-    const outbox = new OutboxMessageRepository(manager);
+    const outbox = repositories.outbox;
     const eventContext = {
       ...context,
       occurredAt: at,
       eventId: crypto.randomUUID(),
     };
     if (transaction.status === WagerTransactionStatus.PendingReference && !wasPending) {
-      await new PendingReferenceWorkRepository(manager).schedule(
+      await repositories.pending.schedule(
         transaction.id,
         new Date(at.getTime() + this.pendingConfig.PENDING_REFERENCE_TTL_MS),
         nextReferenceAttempt(at, 0, this.pendingConfig),

@@ -1,7 +1,7 @@
 import type { Provider } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { DATABASE_CONFIG } from '@/database/database.module';
-import type { DatabaseConfig } from '@/config/database';
+import { FINANCIAL_TRANSACTION } from '@/database/database.module';
+import type { FinancialTransaction } from '@/shared/interfaces/financial-transaction.interface';
 import { GetWagerTransactionUseCase } from '@/modules/wagering/application/get-wager-transaction.use-case';
 import { ProcessWagerTransactionUseCase } from '@/modules/wagering/application/process-wager-transaction.use-case';
 import { WagerTransactionRepository } from '@/modules/wagering/infrastructure/persistence/repositories/wager-transaction.repository';
@@ -17,8 +17,8 @@ export const WAGERING_PROVIDERS: Provider[] = [
   },
   {
     provide: ProcessWagerTransactionUseCase,
-    inject: [DataSource, DATABASE_CONFIG],
-    useFactory: (dataSource: DataSource, config: DatabaseConfig) =>
-      new ProcessWagerTransactionUseCase(dataSource, config),
+    inject: [FINANCIAL_TRANSACTION],
+    useFactory: (transaction: FinancialTransaction) =>
+      new ProcessWagerTransactionUseCase(transaction),
   },
 ];

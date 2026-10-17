@@ -1,3 +1,4 @@
+import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startPostgresTest } from '@test/support/postgres.util';
 import { OpenWalletUseCase } from '@/modules/wallet/application/open-wallet.use-case';
@@ -33,8 +34,8 @@ beforeAll(async () => {
   const config = readDatabaseConfig({
     DATABASE_URL: db.app.options.type === 'postgres' ? db.app.options.url! : '',
   });
-  openWallet = new OpenWalletUseCase(db.app, config);
-  processWager = new ProcessWagerTransactionUseCase(db.app, config);
+  openWallet = new OpenWalletUseCase(createFinancialTransaction(db.app, config));
+  processWager = new ProcessWagerTransactionUseCase(createFinancialTransaction(db.app, config));
 }, 120_000);
 afterAll(async () => {
   await db?.close();
@@ -539,8 +540,7 @@ test('TTL and attempt exhaustion reject pending work independently; stale claims
       DATABASE_URL: db.app.options.type === 'postgres' ? db.app.options.url! : '',
     });
     const useCase = new ProcessWagerTransactionUseCase(
-      db.app,
-      config,
+      createFinancialTransaction(db.app, config),
       readPendingReferenceConfig({
         PENDING_REFERENCE_MAX_ATTEMPTS: reason === 'attempts' ? '1' : '10',
       }),

@@ -1,3 +1,4 @@
+import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 // This executable fixture is excluded from production builds. Its pauses are test-only.
 import { createDatabaseDataSource } from '@/database/data-source';
 import { DATABASE_ENTITIES } from '@/database/entities';
@@ -19,7 +20,10 @@ const database = readDatabaseConfig(),
   pending = readPendingReferenceConfig();
 const dataSource = await createDatabaseDataSource(database, DATABASE_ENTITIES).initialize();
 const sqs = new SqsGateway(messaging);
-const processWager = new ProcessWagerTransactionUseCase(dataSource, database, pending);
+const processWager = new ProcessWagerTransactionUseCase(
+  createFinancialTransaction(dataSource, database),
+  pending,
+);
 const phase = (value: string) =>
   process.stdout.write(JSON.stringify({ phase: value, pid: process.pid }) + '\n');
 const acknowledge = sqs.delete.bind(sqs);
