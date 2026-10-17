@@ -6,6 +6,9 @@ import { z } from 'zod';
 // Attempts and TTL are separate ceilings; the attempt limit may be reached first.
 const PENDING_REFERENCE_CONFIG_SCHEMA = z
   .object({
+    PENDING_REFERENCE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+    PENDING_REFERENCE_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
+    PENDING_REFERENCE_LEASE_MS: z.coerce.number().int().positive().default(30000),
     PENDING_REFERENCE_TTL_MS: z.coerce.number().int().positive().default(300_000),
     PENDING_REFERENCE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(10),
     PENDING_REFERENCE_RETRY_BASE_MS: z.coerce.number().int().positive().default(1_000),
