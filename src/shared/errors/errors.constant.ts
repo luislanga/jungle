@@ -1,4 +1,8 @@
 export const DOMAIN_ERRORS = {
+  UNSUPPORTED_CURRENCY: {
+    code: 'UNSUPPORTED_CURRENCY',
+    message: 'This deployment accepts BRL only',
+  },
   INBOX_PAYLOAD_CONFLICT: {
     code: 'INBOX_PAYLOAD_CONFLICT',
     message: 'Envelope message ID was reused with different business data',
@@ -107,3 +111,13 @@ export const DOMAIN_ERRORS = {
 } as const;
 
 export type DomainErrorDefinition = (typeof DOMAIN_ERRORS)[keyof typeof DOMAIN_ERRORS];
+
+export const APPLICATION_ERRORS = {
+  WALLET_CONFLICT: {
+    code: 'WALLET_CONFLICT',
+    message: 'A wallet already exists for this player and currency',
+  },
+} as const;
+
+export type ApplicationErrorDefinition =
+  (typeof APPLICATION_ERRORS)[keyof typeof APPLICATION_ERRORS];

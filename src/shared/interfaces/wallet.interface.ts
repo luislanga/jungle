@@ -27,3 +27,8 @@ export interface LedgerEntryState {
   balanceAfter: Money;
   createdAt: Date;
 }
+
+export interface OpenWalletInput {
+  playerId: string;
+  initialBalance: Money;
+}
