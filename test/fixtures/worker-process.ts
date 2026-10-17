@@ -42,6 +42,13 @@ if (process.env.TEST_WORKER_MODE === 'hold-before-ack') {
     await new Promise<void>(() => {});
   };
 }
+if (process.env.TEST_WORKER_MODE === 'hold-before-publish') {
+  sqs.send = async () => {
+    phase('before-publish');
+    await new Promise<void>(() => {});
+    throw new Error('Unreachable test barrier');
+  };
+}
 if (process.env.TEST_WORKER_MODE === 'hold-after-publish') {
   const original = sqs.send.bind(sqs);
   sqs.send = async (...args) => {
