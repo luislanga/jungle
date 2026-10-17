@@ -1,3 +1,7 @@
+import {
+  createPendingWorkStore,
+  createOutboxStore,
+} from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
 import { startMessagingTest, enqueueWager } from '@test/support/messaging.util';
 import { startHttpTest, jsonRequest } from '@test/support/http.util';
@@ -76,11 +80,13 @@ test('JSON logs trace HTTP/SQS/replay/resume/publish outcomes without bodies, am
       [pending.transactionId],
     );
     await new PendingReferenceResolver(
-      db.app,
-      financialServices(db.app).config,
+      createPendingWorkStore(db.app, financialServices(db.app).config),
       financialServices(db.app).process,
     ).runOnce();
-    await new OutboxPublisher(db.app, financialServices(db.app).config, db.sqs).runOnce();
+    await new OutboxPublisher(
+      createOutboxStore(db.app, financialServices(db.app).config),
+      db.sqs,
+    ).runOnce();
     writeLog('redaction_probe', {
       correlationId: 'trace-log-test',
       password: 'DO_NOT_LOG_PASSWORD',

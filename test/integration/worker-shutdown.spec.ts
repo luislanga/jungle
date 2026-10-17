@@ -1,3 +1,4 @@
+import { createOutboxStore } from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startMessagingTest, enqueueWager } from '@test/support/messaging.util';
 import {
@@ -156,8 +157,7 @@ test('deadline during publication leaves an expiring claim that another publishe
     if (worker.child.exitCode === null) worker.child.kill('SIGKILL');
   }
   const publisher = new OutboxPublisher(
-    db.app,
-    financialServices(db.app).config,
+    createOutboxStore(db.app, financialServices(db.app).config),
     db.sqs,
     readOutboxConfig({}),
   );

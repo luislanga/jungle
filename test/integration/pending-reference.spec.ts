@@ -1,3 +1,4 @@
+import { createPendingWorkStore } from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startPostgresTest } from '@test/support/postgres.util';
@@ -28,8 +29,7 @@ afterAll(async () => {
 }, 30_000);
 const resolver = (batch = 20) =>
   new PendingReferenceResolver(
-    db.app,
-    financialServices(db.app).config,
+    createPendingWorkStore(db.app, financialServices(db.app).config),
     financialServices(db.app).process,
     { ...readPendingReferenceConfig({}), PENDING_REFERENCE_BATCH_SIZE: batch },
   );
@@ -218,21 +218,23 @@ test('configured attempt overrides survive reconstruction of a resolver instance
   );
   await due(pending.transactionId);
   expect(
-    (await new PendingReferenceResolver(
-      db.app,
-      database,
-      service,
-      config
-    ).runOnce()).deferred,
+    (
+      await new PendingReferenceResolver(
+        createPendingWorkStore(db.app, database),
+        service,
+        config,
+      ).runOnce()
+    ).deferred,
   ).toBe(1);
   await due(pending.transactionId);
   expect(
-    (await new PendingReferenceResolver(
-      db.app,
-      database,
-      service,
-      config
-    ).runOnce()).completed,
+    (
+      await new PendingReferenceResolver(
+        createPendingWorkStore(db.app, database),
+        service,
+        config,
+      ).runOnce()
+    ).completed,
   ).toBe(1);
   expect((await status(pending.transactionId)).status).toBe(Status.Rejected);
   await assertWalletLedger(db.app, wallet.id, '100.00');

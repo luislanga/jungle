@@ -1,16 +1,15 @@
 import { HealthModule } from '@/modules/health/health.module';
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
 import { MessagingModule } from '@/modules/messaging/messaging.module';
 import { DatabaseModule } from '@/database/database.module';
 import { WageringModule } from '@/modules/wagering/wagering.module';
 import { WalletModule } from '@/modules/wallet/wallet.module';
-import { HttpErrorFilter } from '@/shared/presentation/http-error.filter';
+import { APP_PROVIDERS } from '@/app.providers';
 import { CorrelationMiddleware } from '@/shared/presentation/correlation.middleware';
 
 @Module({
   imports: [DatabaseModule, WalletModule, WageringModule, MessagingModule, HealthModule],
-  providers: [{ provide: APP_FILTER, useClass: HttpErrorFilter }],
+  providers: [...APP_PROVIDERS],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -1,3 +1,7 @@
+import {
+  createOutboxStore,
+  createPendingWorkStore,
+} from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 // This executable fixture is excluded from production builds. Its pauses are test-only.
 import { createDatabaseDataSource } from '@/database/data-source';
@@ -65,18 +69,8 @@ if (process.env.TEST_WORKER_MODE === 'hold-after-publish') {
 const consumer = new SqsWagerConsumer(sqs, processWager, messaging);
 const runtime = new WorkerRuntime(
   consumer,
-  new OutboxPublisher(
-    dataSource,
-    database,
-    sqs,
-    outbox
-  ),
-  new PendingReferenceResolver(
-    dataSource,
-    database,
-    processWager,
-    pending
-  ),
+  new OutboxPublisher(createOutboxStore(dataSource, database), sqs, outbox),
+  new PendingReferenceResolver(createPendingWorkStore(dataSource, database), processWager, pending),
   {
     worker: readWorkerConfig(),
     messaging,

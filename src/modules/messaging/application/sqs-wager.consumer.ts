@@ -7,17 +7,16 @@ import {
   deliveryRetryDelay,
 } from '@/modules/messaging/application/delivery-failure.policy';
 import type { SqsWagerMessage } from '@/shared/interfaces/wager-command.interface';
-import type { Message } from '@aws-sdk/client-sqs';
 import type { ProcessWagerTransactionUseCase } from '@/modules/wagering/application/process-wager-transaction.use-case';
 import { parseSqsWager } from '@/modules/wagering/application/contracts/wager-command.contract';
-import type { SqsGateway } from '@/modules/messaging/infrastructure/sqs/sqs.gateway';
+import type { MessageQueue, QueueMessage } from '@/shared/interfaces/message-queue.interface';
 import { INBOUND_QUEUE_NAME, WAGER_CONSUMER_NAME } from '@/shared/consts/messaging.constant';
 
 export class SqsWagerConsumer {
   private readonly active = new Map<string, { queueUrl: string; heartbeat: AbortController }>();
 
   constructor(
-    private readonly sqs: SqsGateway,
+    private readonly sqs: MessageQueue,
     private readonly processWager: ProcessWagerTransactionUseCase,
     private readonly config: MessagingConfig = readMessagingConfig(),
   ) {}
@@ -42,7 +41,7 @@ export class SqsWagerConsumer {
     };
   }
 
-  async handle(queueUrl: string, message: Message): Promise<void> {
+  async handle(queueUrl: string, message: QueueMessage): Promise<void> {
     let envelope: SqsWagerMessage | undefined;
     try {
       if (!message.Body || !message.ReceiptHandle)

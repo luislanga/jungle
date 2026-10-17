@@ -1,3 +1,4 @@
+import type { MessageQueue } from '@/shared/interfaces/message-queue.interface';
 import {
   ChangeMessageVisibilityCommand,
   DeleteMessageCommand,
@@ -9,7 +10,7 @@ import {
 } from '@aws-sdk/client-sqs';
 import type { MessagingConfig } from '@/config/messaging';
 
-export class SqsGateway {
+export class SqsGateway implements MessageQueue {
   readonly client: SQSClient;
   private readonly queueUrls = new Map<string, Promise<string>>();
 

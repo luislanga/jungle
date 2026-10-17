@@ -1,3 +1,4 @@
+import { createOutboxStore } from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startMessagingTest } from '@test/support/messaging.util';
 import {
@@ -57,7 +58,10 @@ for (const [table, operation, condition, deferred] of FAULTS) {
       ...TEST_CONTEXT,
       inbox: { consumerName: 'atomicity-test', messageId: crypto.randomUUID() },
     };
-    const publisher = new OutboxPublisher(db.app, financialServices(db.app).config, db.sqs);
+    const publisher = new OutboxPublisher(
+      createOutboxStore(db.app, financialServices(db.app).config),
+      db.sqs,
+    );
     // Publish the opening first so any later claim would belong to the failed wager.
     await publisher.runOnce();
     const before = await snapshot(wallet.id);

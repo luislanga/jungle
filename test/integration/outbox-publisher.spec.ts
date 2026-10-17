@@ -1,3 +1,4 @@
+import { createOutboxStore } from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
 import { startMessagingTest } from '@test/support/messaging.util';
 import {
@@ -25,8 +26,7 @@ afterAll(async () => {
 }, 30_000);
 const publisher = (batch = 20, sqs = db.sqs) =>
   new OutboxPublisher(
-    db.app,
-    financialServices(db.app).config,
+    createOutboxStore(db.app, financialServices(db.app).config),
     sqs,
     readOutboxConfig({ OUTBOX_BATCH_SIZE: String(batch) }),
   );

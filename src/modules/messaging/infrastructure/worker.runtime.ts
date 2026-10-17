@@ -1,8 +1,5 @@
+import type { WorkerSettings } from '@/shared/interfaces/worker.interface';
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { WorkerConfig } from '@/config/workers';
-import type { OutboxConfig } from '@/config/outbox';
-import type { MessagingConfig } from '@/config/messaging';
-import type { PendingReferenceConfig } from '@/config/pending-reference';
 import type { SqsWagerConsumer } from '@/modules/messaging/application/sqs-wager.consumer';
 import type { OutboxPublisher } from '@/modules/messaging/application/outbox.publisher';
 import type { PendingReferenceResolver } from '@/modules/messaging/application/pending-reference.resolver';
@@ -18,12 +15,7 @@ export class WorkerRuntime {
     private readonly consumer: SqsWagerConsumer,
     private readonly publisher: OutboxPublisher,
     private readonly resolver: PendingReferenceResolver,
-    private readonly settings: {
-      worker: WorkerConfig;
-      outbox: OutboxConfig;
-      pending: PendingReferenceConfig;
-      messaging: MessagingConfig;
-    },
+    private readonly settings: WorkerSettings,
   ) {}
 
   start(): void {

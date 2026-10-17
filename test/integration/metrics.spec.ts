@@ -1,3 +1,7 @@
+import {
+  createPendingWorkStore,
+  createOutboxStore,
+} from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
 import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
 import { startMessagingTest } from '@test/support/messaging.util';
 import { startHttpTest } from '@test/support/http.util';
@@ -69,7 +73,10 @@ test('real transitions/replays/retries, lock conflicts, latency, Outbox lag, DLQ
     [pending.transactionId],
   );
   const pendingOutcomes = await counter(OUTCOME_COUNT, 'PENDING_REFERENCE');
-  await new PendingReferenceResolver(db.app, financialServices(db.app).config, service).runOnce();
+  await new PendingReferenceResolver(
+    createPendingWorkStore(db.app, financialServices(db.app).config),
+    service,
+  ).runOnce();
   expect(await counter(RETRY_COUNT, 'pending_reference')).toBeGreaterThan(0);
   expect(await counter(OUTCOME_COUNT, 'PENDING_REFERENCE')).toBe(pendingOutcomes);
   const blocker = db.app.createQueryRunner();
@@ -127,7 +134,10 @@ test('real transitions/replays/retries, lock conflicts, latency, Outbox lag, DLQ
   expect(text).toContain('wager_processing_duration_seconds_count{operation="submit"}');
   expect((await db.sqs.queueDepth(dlq)).visible).toBe(1);
   expect(await counter(RETRY_COUNT, 'sqs')).toBeGreaterThanOrEqual(5);
-  const publish = new OutboxPublisher(db.app, financialServices(db.app).config, db.sqs);
+  const publish = new OutboxPublisher(
+    createOutboxStore(db.app, financialServices(db.app).config),
+    db.sqs,
+  );
   const sends = spyOn(db.sqs, 'send').mockRejectedValueOnce(new Error('Injected send failure'));
   try {
     await publish.runOnce();
