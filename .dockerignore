@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+node_modules
+dist
+coverage
+test-results
+AGENTS.md
+ARCHITECTURE.md
+docs/planning
+docs/DEVELOPMENT.md
+.codex

@@ -1,0 +1,107 @@
+name: wagering
+
+x-app: &app
+  build: .
+  environment:
+    PORT: 3000
+    DATABASE_URL: postgresql://wager_app:${APP_DATABASE_PASSWORD:-local-app}@postgres:5432/wagering
+    DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
+    DATABASE_CONNECT_TIMEOUT_MS: ${DATABASE_CONNECT_TIMEOUT_MS:-5000}
+    DATABASE_LOCK_TIMEOUT_MS: ${DATABASE_LOCK_TIMEOUT_MS:-2000}
+    DATABASE_TRANSACTION_TIMEOUT_MS: ${DATABASE_TRANSACTION_TIMEOUT_MS:-5000}
+    DATABASE_TRANSACTION_MAX_ATTEMPTS: ${DATABASE_TRANSACTION_MAX_ATTEMPTS:-3}
+    DATABASE_RETRY_BASE_DELAY_MS: ${DATABASE_RETRY_BASE_DELAY_MS:-25}
+    DATABASE_RETRY_MAX_DELAY_MS: ${DATABASE_RETRY_MAX_DELAY_MS:-250}
+    AWS_ENDPOINT_URL: http://localstack:4566
+    AWS_REGION: us-east-1
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+  depends_on:
+    migrations:
+      condition: service_completed_successfully
+    queue-init:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: wagering
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-admin}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:-local-app}
+      MIGRATION_DATABASE_PASSWORD: ${MIGRATION_DATABASE_PASSWORD:-local-migrator}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init-roles.sh:/docker-entrypoint-initdb.d/init-roles.sh:ro
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'wagering']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrations:
+    build: ./docker/liquibase
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/wagering
+      LIQUIBASE_COMMAND_USERNAME: wager_migrator
+      LIQUIBASE_COMMAND_PASSWORD: ${MIGRATION_DATABASE_PASSWORD:-local-migrator}
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: db.changelog.yaml
+      LIQUIBASE_SEARCH_PATH: /liquibase/changelog,/liquibase
+      LIQUIBASE_COMMAND_DEFAULT_SCHEMA_NAME: public
+      LIQUIBASE_ANALYTICS_ENABLED: 'false'
+    volumes:
+      - ./database/changelog:/liquibase/changelog:ro
+    command: ['update']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  localstack:
+    image: localstack/localstack:4.9.2
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - '127.0.0.1:${LOCALSTACK_PORT:-4566}:4566'
+    healthcheck:
+      disable: true
+
+  queue-init:
+    image: localstack/localstack:4.9.2
+    entrypoint: ['/bin/sh', '/etc/localstack/init-queues.sh']
+    environment:
+      LOCALSTACK_HOST: localstack
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_RETRY_MODE: standard
+      AWS_MAX_ATTEMPTS: 10
+    volumes:
+      - ./docker/localstack/init-queues.sh:/etc/localstack/init-queues.sh:ro
+      - ./docker/localstack/inbound-attributes.json:/etc/localstack/inbound-attributes.json:ro
+    depends_on:
+      localstack:
+        condition: service_started
+    restart: 'no'
+
+  app:
+    <<: *app
+    ports:
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
+
+  app2:
+    <<: *app
+    ports:
+      - '127.0.0.1:${APP2_PORT:-3001}:3000'
+
+  app3:
+    <<: *app
+    ports:
+      - '127.0.0.1:${APP3_PORT:-3002}:3000'
+
+volumes:
+  postgres_data:

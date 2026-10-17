@@ -1,0 +1,6 @@
+services:
+  migrations:
+    environment:
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: failure.sql
+    volumes:
+      - ./test/fixtures/migration-failure.sql:/liquibase/failure.sql:ro
