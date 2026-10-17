@@ -2,6 +2,7 @@ import {
   ChangeMessageVisibilityCommand,
   DeleteMessageCommand,
   GetQueueUrlCommand,
+  GetQueueAttributesCommand,
   ReceiveMessageCommand,
   SendMessageCommand,
   SQSClient,
@@ -100,6 +101,21 @@ export class SqsGateway {
       }),
       { abortSignal: AbortSignal.timeout(this.config.SQS_REQUEST_TIMEOUT_MS) },
     );
+  }
+
+  async queueDepth(queueUrl: string) {
+    const result = await this.client.send(
+      new GetQueueAttributesCommand({
+        QueueUrl: queueUrl,
+        AttributeNames: ['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible'],
+      }),
+      { abortSignal: AbortSignal.timeout(this.config.SQS_REQUEST_TIMEOUT_MS) },
+    );
+    // Observing the DLQ must not receive/delete messages or advance their receive counts.
+    return {
+      visible: Number(result.Attributes?.ApproximateNumberOfMessages ?? '0'),
+      inFlight: Number(result.Attributes?.ApproximateNumberOfMessagesNotVisible ?? '0'),
+    };
   }
 
   close(): void {
