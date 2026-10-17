@@ -13,7 +13,7 @@ export const WAGER_BUSINESS_SCHEMA = z
     gameId: z.string().min(1),
     kind: z.enum([Kind.Bet, Kind.Win, Kind.Loss, Kind.Refund, Kind.Rollback]),
     money: MONEY_INPUT_SCHEMA,
-    // README §7 allows WIN payloads both with and without a BET reference.
+    // README 7 allows WIN payloads both with and without a BET reference (optional referenceExternalTransactionId).
     referenceExternalTransactionId: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {

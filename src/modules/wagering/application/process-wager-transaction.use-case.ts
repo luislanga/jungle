@@ -49,22 +49,25 @@ export class ProcessWagerTransactionUseCase {
     command: WagerCommand,
     context: WagerProcessingContext,
   ): Promise<WagerProcessingResult> {
-    // HTTP and SQS enter the same transaction. Every write uses this manager, including
-    // Inbox and Outbox; a failed commit must not leave a debit or event behind.
     return withTransaction(this.dataSource, this.config, async (manager) => {
       const wagers = new WagerTransactionRepository(manager);
       let stored = await wagers.findByKey(command.idempotencyKey, true);
       let created = false;
+
       if (!stored) {
         const wallet = await new WalletRepository(manager).findById(command.data.walletId);
+
         if (!wallet) throw new ApplicationError(APPLICATION_ERRORS.WALLET_NOT_FOUND);
+
         if (
           wallet.playerId !== command.data.playerId ||
           wallet.currency !== command.data.money.currency
         ) {
           throw new ApplicationError(APPLICATION_ERRORS.INVALID_WALLET_CONTEXT);
         }
+
         const { referenceExternalTransactionId, ...businessData } = command.data;
+
         const transaction = WagerTransaction.create({
           ...businessData,
           ...(referenceExternalTransactionId === undefined
@@ -75,18 +78,25 @@ export class ProcessWagerTransactionUseCase {
           payloadHash: command.payloadHash,
           money: Money.from(command.data.money),
         });
+
         await wagers.insertIfAbsent(transaction);
+
         stored = await wagers.findByKey(command.idempotencyKey, true);
+
         if (!stored) throw new ApplicationError(APPLICATION_ERRORS.EXTERNAL_TRANSACTION_CONFLICT);
+
         created = stored.transaction.id === transaction.id;
       }
+
       if (!stored.transaction.matchesPayload(command.payloadHash))
         throw new ApplicationError(APPLICATION_ERRORS.IDEMPOTENCY_CONFLICT);
+
       const inbox = context.inbox
         ? await new InboxMessageRepository(manager).receive(
             InboxMessage.receive({ ...context.inbox, payloadHash: command.payloadHash }),
           )
         : undefined;
+
       if (!created) {
         if (inbox) {
           inbox.markProcessed(new Date());
@@ -94,6 +104,7 @@ export class ProcessWagerTransactionUseCase {
         }
         return this.result(stored, true);
       }
+
       const result = await this.apply(manager, stored.transaction, context);
       if (inbox) {
         inbox.markProcessed(new Date());

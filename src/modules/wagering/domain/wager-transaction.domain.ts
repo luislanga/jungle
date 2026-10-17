@@ -185,7 +185,7 @@ export class WagerTransaction {
     if (this.requiresReference() && !this.money.equals(reference.money)) {
       throw new DomainError(DOMAIN_ERRORS.REFERENCE_AMOUNT_MISMATCH);
     }
-    // README §7, rule 4 allows one reversal of each kind. We follow that literal
+    // README 7, rule 4 allows one reversal of each kind. We follow that literal
     // rule for this challenge, even though REFUND plus ROLLBACK can double-credit
     // the original BET. In production we would discuss this with product,
     // finance and the provider before implementing it.
@@ -252,7 +252,7 @@ export class WagerTransaction {
   }
 
   private assertAmount(): void {
-    // README §6.1 rejects negative input but leaves zero wagers unspecified.
+    // README 6.1 rejects negative input but leaves zero wagers unspecified.
     // Our agreed interpretation accepts zero LOSS; all money-moving kinds are positive.
     if (
       this.money.isNegative() ||

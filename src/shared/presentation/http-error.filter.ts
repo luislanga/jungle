@@ -13,6 +13,7 @@ import { isTransientDatabaseError } from '@/database/transient-error.util';
 
 const APPLICATION_HTTP_STATUS: Record<ApplicationError['code'], number> = {
   WALLET_NOT_FOUND: 404,
+  TRANSACTION_NOT_FOUND: 404,
   INVALID_WALLET_CONTEXT: 400,
   IDEMPOTENCY_CONFLICT: 409,
   EXTERNAL_TRANSACTION_CONFLICT: 409,

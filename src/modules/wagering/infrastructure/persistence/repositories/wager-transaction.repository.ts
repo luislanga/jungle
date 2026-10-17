@@ -65,7 +65,6 @@ export class WagerTransactionRepository {
 
   async insertIfAbsent(transaction: WagerTransaction): Promise<void> {
     requireTransaction(this.manager);
-    // A uniqueness race must not abort the transaction before we inspect the winner.
     await this.manager
       .getRepository(WagerTransactionEntity)
       .createQueryBuilder()
