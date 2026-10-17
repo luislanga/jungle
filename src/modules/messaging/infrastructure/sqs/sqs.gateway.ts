@@ -99,7 +99,9 @@ export class SqsGateway {
         ReceiptHandle: receiptHandle,
         VisibilityTimeout: seconds,
       }),
-      { abortSignal: AbortSignal.timeout(this.config.SQS_REQUEST_TIMEOUT_MS) },
+      {
+        abortSignal: AbortSignal.timeout(this.config.SQS_REQUEST_TIMEOUT_MS),
+      },
     );
   }
 

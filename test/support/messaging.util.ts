@@ -15,6 +15,7 @@ export async function startMessagingTest() {
       AWS_SECRET_ACCESS_KEY: 'test',
       SQS_WAIT_TIME_SECONDS: '0',
       SQS_VISIBILITY_TIMEOUT_SECONDS: '1',
+      SQS_HEARTBEAT_INTERVAL_MS: '100',
     });
     const sqs = new SqsGateway(config);
     const queueUrl = await sqs.queueUrl(INBOUND_QUEUE_NAME);

@@ -61,7 +61,7 @@ export async function assertWalletLedger(
   expect(row).toEqual({ balance, calculated: balance });
 }
 
-export async function waitFor(check: () => Promise<boolean>, timeoutMs = 5000) {
+export async function waitFor(check: () => boolean | Promise<boolean>, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
   while (!(await check())) {
     if (Date.now() >= deadline) throw new Error('Timed out waiting for test barrier');
