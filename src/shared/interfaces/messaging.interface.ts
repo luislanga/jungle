@@ -1,3 +1,4 @@
+import type { OutboxMessage } from '@/modules/messaging/domain/outbox-message.domain';
 import type { EventEnvelope } from '@/shared/interfaces/event.interface';
 
 export interface InboxState {
@@ -20,3 +21,19 @@ export interface OutboxState {
 }
 
 export type ReceiveInboxMessageProps = Omit<InboxState, 'receivedAt' | 'processedAt'>;
+
+export interface WorkClaimOptions {
+  owner: string;
+  limit: number;
+  leaseMs: number;
+}
+export interface ClaimedOutbox {
+  message: OutboxMessage;
+  token: string;
+}
+export interface PendingReferenceClaim {
+  transactionId: string;
+  attempts: number;
+  expiresAt: Date;
+  token: string;
+}

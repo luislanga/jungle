@@ -1,4 +1,8 @@
 export const DOMAIN_ERRORS = {
+  INBOX_PAYLOAD_CONFLICT: {
+    code: 'INBOX_PAYLOAD_CONFLICT',
+    message: 'Envelope message ID was reused with different business data',
+  },
   MONEY_OVERFLOW: {
     code: 'MONEY_OVERFLOW',
     message: 'Amount exceeds NUMERIC(20,2)',
