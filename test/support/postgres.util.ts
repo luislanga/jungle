@@ -24,6 +24,10 @@ export async function startPostgresTest() {
   const env = {
     POSTGRES_PORT: '0',
     LOCALSTACK_PORT: '0',
+    APP_PORT: '0',
+    APP2_PORT: '0',
+    APP3_PORT: '0',
+    WORKERS_ENABLED: 'true',
     POSTGRES_PASSWORD: crypto.randomUUID(),
     APP_DATABASE_PASSWORD: crypto.randomUUID(),
     MIGRATION_DATABASE_PASSWORD: crypto.randomUUID(),
