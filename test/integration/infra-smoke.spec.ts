@@ -11,7 +11,7 @@ const env = {
   POSTGRES_PORT: '0',
   LOCALSTACK_PORT: '0',
 };
-const queues = ['wager-transactions.fifo', 'wager-transactions-dlq.fifo', 'wager-events.fifo'];
+const QUEUES = ['wager-transactions.fifo', 'wager-transactions-dlq.fifo', 'wager-events.fifo'];
 
 async function run(args: string[]): Promise<string> {
   const result = await compose(project, env, args);
@@ -105,7 +105,7 @@ test('queue initialization is repeatable and preserves routing and existing mess
   ]);
   await script('queue:init');
   await script('queue:init');
-  for (const name of queues) {
+  for (const name of QUEUES) {
     const attrs = await attributes(name);
     expect(attrs.FifoQueue).toBe('true');
     if (name !== 'wager-transactions-dlq.fifo')
@@ -134,7 +134,7 @@ test('queue initialization is repeatable and preserves routing and existing mess
 }, 60_000);
 
 test('all three FIFO queues support sending, receiving and deleting messages', async () => {
-  for (const name of queues) {
+  for (const name of QUEUES) {
     const url = `http://localhost:4566/000000000000/${name}`;
     const body = crypto.randomUUID();
     await sqs([

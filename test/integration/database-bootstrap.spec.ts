@@ -10,7 +10,7 @@ interface NumericProbe {
   amount: string;
 }
 
-const probeEntity = new EntitySchema<NumericProbe>({
+const PROBE_ENTITY = new EntitySchema<NumericProbe>({
   name: 'NumericProbe',
   tableName: 'numeric_probe',
   columns: {
@@ -42,7 +42,7 @@ async function run(args: string[]): Promise<string> {
 
 async function port(service: string, internalPort: number): Promise<string> {
   const address = (await run(['port', service, String(internalPort)])).trim();
-  const assigned = address.match(/127\.0\.0\.1:(\d+)/)?.[1];
+  const assigned = new URL(`http://${address}`).port;
   if (!assigned) throw new Error(`No published port for ${service}`);
   return assigned;
 }
@@ -74,7 +74,7 @@ beforeAll(async () => {
   const config = readDatabaseConfig({
     DATABASE_URL: `postgresql://wager_app:${env.APP_DATABASE_PASSWORD}@127.0.0.1:${databasePort}/wagering`,
   });
-  application = createDatabaseDataSource(config, [probeEntity]);
+  application = createDatabaseDataSource(config, [PROBE_ENTITY]);
   await application.initialize();
   transactionSettings = config;
 }, 300_000);
@@ -116,7 +116,7 @@ test('complete environment starts only after healthy PostgreSQL and successful L
 
 test('repeated Compose startup does not reapply changes or remove existing data', async () => {
   const id = crypto.randomUUID();
-  await application.getRepository(probeEntity).save({ id, amount: '0.10' });
+  await application.getRepository(PROBE_ENTITY).save({ id, amount: '0.10' });
   const before = await migrator.query<unknown[]>(
     'SELECT id, dateexecuted, md5sum FROM databasechangelog',
   );
@@ -125,7 +125,7 @@ test('repeated Compose startup does not reapply changes or remove existing data'
     'SELECT id, dateexecuted, md5sum FROM databasechangelog',
   );
   expect(after).toEqual(before);
-  expect((await application.getRepository(probeEntity).findOneByOrFail({ id })).amount).toBe(
+  expect((await application.getRepository(PROBE_ENTITY).findOneByOrFail({ id })).amount).toBe(
     '0.10',
   );
 }, 60_000);
@@ -150,7 +150,7 @@ test('explicit SQL rollback and reapply work against PostgreSQL', async () => {
 
 test('failed migration blocks app startup and rolls back its partial SQL', async () => {
   const id = crypto.randomUUID();
-  await application.getRepository(probeEntity).save({ id, amount: '5.00' });
+  await application.getRepository(PROBE_ENTITY).save({ id, amount: '5.00' });
   await run(['stop', 'app', 'app2', 'app3']);
   try {
     const result = await compose(project, env, [
@@ -168,7 +168,7 @@ test('failed migration blocks app startup and rolls back its partial SQL', async
       "SELECT to_regclass('wagering.failed_probe')::text AS failed",
     );
     expect(tables[0]?.failed).toBeNull();
-    expect((await application.getRepository(probeEntity).findOneByOrFail({ id })).amount).toBe(
+    expect((await application.getRepository(PROBE_ENTITY).findOneByOrFail({ id })).amount).toBe(
       '5.00',
     );
   } finally {
@@ -195,9 +195,9 @@ test('NUMERIC round-trips exact strings using the PostgreSQL driver', async () =
   const id = crypto.randomUUID();
   const money = '999999999999999999.99';
   await withTransaction(application, transactionSettings, (manager) =>
-    manager.getRepository(probeEntity).save({ id, amount: money }),
+    manager.getRepository(PROBE_ENTITY).save({ id, amount: money }),
   );
-  const stored = await application.getRepository(probeEntity).findOneByOrFail({ id });
+  const stored = await application.getRepository(PROBE_ENTITY).findOneByOrFail({ id });
   expect(stored.amount).toBe(money);
   expect(typeof stored.amount).toBe('string');
 });
@@ -209,13 +209,13 @@ test('transaction callback shares one manager and rolls back all writes on error
       withTransaction(application, transactionSettings, async (manager) => {
         expect(manager).not.toBe(application.manager);
         expect(manager.queryRunner?.isTransactionActive).toBe(true);
-        await manager.getRepository(probeEntity).save({ id: crypto.randomUUID(), amount: '0.10' });
-        await manager.getRepository(probeEntity).save({ id: crypto.randomUUID(), amount: '0.20' });
+        await manager.getRepository(PROBE_ENTITY).save({ id: crypto.randomUUID(), amount: '0.10' });
+        await manager.getRepository(PROBE_ENTITY).save({ id: crypto.randomUUID(), amount: '0.20' });
         throw failure;
       }),
     ),
   ).toBe(failure);
-  expect(await application.getRepository(probeEntity).count()).toBe(0);
+  expect(await application.getRepository(PROBE_ENTITY).count()).toBe(0);
 });
 
 test('timeouts and READ COMMITTED are transaction-local', async () => {
@@ -245,7 +245,7 @@ test('retry uses a fresh transaction and has no partial effects', async () => {
   let calls = 0;
   await withTransaction(application, settings, async (manager) => {
     managers.add(manager);
-    await manager.getRepository(probeEntity).save({ id: crypto.randomUUID(), amount: '1.00' });
+    await manager.getRepository(PROBE_ENTITY).save({ id: crypto.randomUUID(), amount: '1.00' });
     if (++calls === 1) {
       await manager.query(
         "DO $$ BEGIN RAISE EXCEPTION 'retry probe' USING ERRCODE='40P01'; END $$",
@@ -254,7 +254,7 @@ test('retry uses a fresh transaction and has no partial effects', async () => {
   });
   expect(calls).toBe(2);
   expect(managers.size).toBe(2);
-  expect(await application.getRepository(probeEntity).count()).toBe(1);
+  expect(await application.getRepository(PROBE_ENTITY).count()).toBe(1);
 });
 
 test('retry exhaustion is bounded and duplicate keys are not retried', async () => {
@@ -282,11 +282,11 @@ test('retry exhaustion is bounded and duplicate keys are not retried', async () 
     await failureOf(
       withTransaction(application, settings, async (manager) => {
         attempts++;
-        await manager.getRepository(probeEntity).insert({ id, amount: '1.00' });
-        await manager.getRepository(probeEntity).insert({ id, amount: '1.00' });
+        await manager.getRepository(PROBE_ENTITY).insert({ id, amount: '1.00' });
+        await manager.getRepository(PROBE_ENTITY).insert({ id, amount: '1.00' });
       }),
     ),
   ).toHaveProperty('message', expect.stringContaining('duplicate key'));
   expect(attempts).toBe(1);
-  expect(await application.getRepository(probeEntity).count()).toBe(0);
+  expect(await application.getRepository(PROBE_ENTITY).count()).toBe(0);
 });

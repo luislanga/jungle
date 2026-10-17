@@ -1,11 +1,6 @@
 import { DataSource, type EntityManager, QueryFailedError } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
-
-function isRetryable(error: unknown): boolean {
-  const cause: unknown = error instanceof QueryFailedError ? error.driverError : error;
-  if (typeof cause !== 'object' || cause === null || !('code' in cause)) return false;
-  return typeof cause.code === 'string' && ['40001', '40P01', '55P03'].includes(cause.code);
-}
+import { isRetryablePostgresError } from '@/shared/utils/postgres.util';
 
 export async function withTransaction<Result>(
   dataSource: DataSource,
@@ -31,7 +26,11 @@ export async function withTransaction<Result>(
         return work(manager);
       });
     } catch (error) {
-      if (attempt === settings.DATABASE_TRANSACTION_MAX_ATTEMPTS || !isRetryable(error))
+      const cause: unknown = error instanceof QueryFailedError ? error.driverError : error;
+      if (
+        attempt === settings.DATABASE_TRANSACTION_MAX_ATTEMPTS ||
+        !isRetryablePostgresError(cause)
+      )
         throw error;
       const delay = Math.min(
         settings.DATABASE_RETRY_MAX_DELAY_MS,
