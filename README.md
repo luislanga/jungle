@@ -1,3 +1,73 @@
+# Distributed Wagering Processor
+
+NestJS + Bun, PostgreSQL/TypeORM, Liquibase and SQS through LocalStack. Three application instances share the same financial transaction path and durable Inbox/Outbox.
+
+## Run everything
+
+Requires Docker Engine with Compose v2. For local development and tests, use Bun **1.4.3**.
+
+```sh
+cp .env.example .env
+docker compose up --build
+```
+
+Compose starts PostgreSQL, runs Liquibase, creates the queues, then starts three applications. HTTP ports are **3000**, **3001** and **3002**. PostgreSQL is **5432**; LocalStack is **4566**. Ports bind to localhost.
+
+```sh
+curl http://localhost:3000/health/live
+curl http://localhost:3000/health/ready
+curl http://localhost:3000/metrics
+```
+
+The database must be healthy and migrations/queue creation must succeed before applications start. `docker compose down` stops the environment and keeps PostgreSQL data. LocalStack queues are in memory and do not survive container recreation.
+
+## Run Bun locally
+
+```sh
+bun install --frozen-lockfile
+bun run infra:up
+bun run migration:up
+bun run start:dev
+```
+
+This runs PostgreSQL and LocalStack in Docker, with the application running on your computer. Stop Compose application containers first if they already occupy port 3000: `docker compose stop app app2 app3`.
+
+For DBeaver: host `localhost`, port `5432`, database `wagering`, schema `wagering`, user `wager_app`, password `local-app` (the `.env.example` defaults). The runtime role deliberately cannot modify/delete ledger history. `wager_migrator` owns migrations; `postgres` is the local administrator.
+
+## Try a wallet
+
+```sh
+curl -X POST http://localhost:3000/wallets \
+  -H 'Content-Type: application/json' \
+  -d '{"playerId":"0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1","initialBalance":{"amount":"100.00","currency":"BRL"}}'
+```
+
+Copy the returned wallet ID into the wager examples in the original specification below. Send a unique `Idempotency-Key` header; retry the same request with the same key after an uncertain response. Amounts are decimal **strings**; this deployment accepts BRL.
+
+## Verify
+
+```sh
+bun run check          # formatting, ESLint and strict TypeScript
+bun run build          # production output with resolved imports
+bun run test           # unit and Nest smoke tests
+bun run test:integration
+bun run test:concurrency
+bun run test:recovery
+# Or run everything:
+bun run verify
+```
+
+Container-backed tests need access to the Docker Engine socket. They create isolated Compose projects, random ports and disposable volumes; they do not reset the development database. Recovery tests deliberately kill their own worker processes and pause their own dependencies.
+
+[Operations and API behavior](docs/OPERATIONS.md) covers migrations, errors, queues, recovery and architectural tradeoffs. Authentication is intentionally omitted for the challenge; the no-op guard is the extension point for an external OIDC identity provider and provider authorization. Health stays public.
+
+## Original challenge
+
+The supplied specification is preserved verbatim below. Its requirements remain authoritative.
+
+<details>
+<summary>Technical challenge (Portuguese)</summary>
+
 # Technical Challenge — Distributed Wagering Processor
 
 ## Bem-vindo à Jungle Gaming 🦧
@@ -744,3 +814,5 @@ wallet.balance == saldo reconstruído pelo ledger
 ### Diferenciais opcionais
 
 Teste de carga também conta como diferencial. Se fizer, exponha como `bun run test:load` e registre ambiente, metodologia, throughput, p50/p95/p99, taxa de erro, conflitos de concorrência e outbox lag. Não há meta de RPS — a qualidade do experimento e a honestidade da análise pesam mais que o número bruto.
+
+</details>
