@@ -23,6 +23,7 @@ export async function startPostgresTest() {
   const project = `wagering-persistence-${crypto.randomUUID()}`;
   const env = {
     POSTGRES_PORT: '0',
+    LOCALSTACK_PORT: '0',
     POSTGRES_PASSWORD: crypto.randomUUID(),
     APP_DATABASE_PASSWORD: crypto.randomUUID(),
     MIGRATION_DATABASE_PASSWORD: crypto.randomUUID(),
