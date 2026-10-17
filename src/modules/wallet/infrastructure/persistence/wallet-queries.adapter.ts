@@ -1,6 +1,10 @@
 import type { DataSource } from 'typeorm';
 import type { WalletQueries } from '@/shared/interfaces/wallet-queries.interface';
-import type { LedgerCursor, LedgerQueryRow } from '@/shared/interfaces/wallet.interface';
+import type {
+  LedgerCursor,
+  LedgerQueryRow,
+  ReconciliationRow,
+} from '@/shared/interfaces/wallet.interface';
 import { WalletRepository } from '@/modules/wallet/infrastructure/persistence/repositories/wallet.repository';
 
 export class WalletQueriesAdapter implements WalletQueries {
@@ -21,5 +25,24 @@ export class WalletQueriesAdapter implements WalletQueries {
        ORDER BY created_at,id LIMIT $4`,
       [walletId, cursor?.createdAt ?? null, cursor?.id ?? null, limit],
     );
+  }
+
+  async reconcile(walletId: string) {
+    // PostgreSQL gives one SELECT one consistent snapshot. Because financial writes
+    // commit together, this sees the wallet and ledger both before or both after a
+    // concurrent commit. It does not need a writer lock or a repair operation.
+    const [row] = await this.dataSource.query<ReconciliationRow[]>(
+      `WITH totals AS (
+        SELECT w.id,w.currency,w.balance,
+          coalesce(sum(CASE WHEN l.direction='CREDIT' THEN l.amount ELSE -l.amount END),0) AS calculated,
+          count(l.id)::integer AS entries
+        FROM wagering.wallets w LEFT JOIN wagering.wallet_ledger_entries l ON l.wallet_id=w.id
+        WHERE w.id=$1 GROUP BY w.id
+      ) SELECT id AS "walletId",currency,balance::text AS stored,
+          round(calculated,2)::text AS calculated,round(balance-calculated,2)::text AS difference,
+          balance=calculated AS consistent,entries AS "checkedEntries" FROM totals`,
+      [walletId],
+    );
+    return row;
   }
 }

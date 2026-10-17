@@ -1,3 +1,5 @@
+import { ReconcileWalletUseCase } from '@/modules/wallet/application/reconcile-wallet.use-case';
+import { ReconciliationSignals } from '@/modules/wallet/infrastructure/observability/reconciliation-signals.service';
 import { ListLedgerUseCase } from '@/modules/wallet/application/list-ledger.use-case';
 import { GetWalletUseCase } from '@/modules/wallet/application/get-wallet.use-case';
 import { WalletQueriesAdapter } from '@/modules/wallet/infrastructure/persistence/wallet-queries.adapter';
@@ -10,6 +12,13 @@ import { ChallengeAuthGuard } from '@/shared/presentation/challenge-auth.guard';
 
 export const WALLET_PROVIDERS: Provider[] = [
   ChallengeAuthGuard,
+  ReconciliationSignals,
+  {
+    provide: ReconcileWalletUseCase,
+    inject: [DataSource, ReconciliationSignals],
+    useFactory: (dataSource: DataSource, signals: ReconciliationSignals) =>
+      new ReconcileWalletUseCase(new WalletQueriesAdapter(dataSource), signals),
+  },
   {
     provide: ListLedgerUseCase,
     inject: [DataSource],

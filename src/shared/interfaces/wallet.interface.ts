@@ -1,3 +1,4 @@
+import type { MoneyProps } from '@/shared/interfaces/money.interface';
 import type { Money } from '@/shared/domain/money.domain';
 import type { LedgerDirection } from '@/shared/enums/wallet.enum';
 
@@ -55,4 +56,23 @@ export interface LedgerPage {
   walletId: string;
   entries: LedgerQueryRow[];
   nextCursor: string | null;
+}
+
+export interface ReconciliationRow {
+  walletId: string;
+  currency: string;
+  stored: string;
+  calculated: string;
+  difference: string;
+  consistent: boolean;
+  checkedEntries: number;
+}
+
+export interface ReconciliationResult {
+  walletId: string;
+  storedBalance: MoneyProps;
+  calculatedBalance: MoneyProps;
+  difference: MoneyProps;
+  consistent: boolean;
+  checkedEntries: number;
 }
