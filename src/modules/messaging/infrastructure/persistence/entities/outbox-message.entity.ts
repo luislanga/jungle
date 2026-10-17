@@ -24,15 +24,31 @@ export class OutboxMessageEntity {
   @Column({ name: 'next_attempt_at', type: 'timestamptz' })
   nextAttemptAt!: Date;
 
-  @Column({ name: 'published_at', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'published_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   publishedAt!: Date | null;
 
-  @Column({ name: 'claim_owner', type: 'text', nullable: true })
+  @Column({
+    name: 'claim_owner',
+    type: 'text',
+    nullable: true,
+  })
   claimOwner!: string | null;
 
-  @Column({ name: 'claim_token', type: 'uuid', nullable: true })
+  @Column({
+    name: 'claim_token',
+    type: 'uuid',
+    nullable: true,
+  })
   claimToken!: string | null;
 
-  @Column({ name: 'claim_until', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'claim_until',
+    type: 'timestamptz',
+    nullable: true,
+  })
   claimUntil!: Date | null;
 }

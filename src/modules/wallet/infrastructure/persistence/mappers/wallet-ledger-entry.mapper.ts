@@ -13,6 +13,7 @@ export class WalletLedgerEntryMapper {
       balanceAfter: Money.from({ amount: row.balanceAfter, currency: row.currency }),
     });
   }
+
   static toPersistence(entry: WalletLedgerEntry): WalletLedgerEntryEntity {
     return Object.assign(new WalletLedgerEntryEntity(), {
       id: entry.id,

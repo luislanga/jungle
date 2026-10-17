@@ -14,7 +14,11 @@ import {
 export function parseHttpWager(body: unknown, idempotencyKey: unknown): WagerCommand {
   const key = IDEMPOTENCY_KEY_SCHEMA.parse(idempotencyKey);
   const data = WAGER_BUSINESS_SCHEMA.parse(body);
-  return { idempotencyKey: key, payloadHash: canonicalHash(data), data };
+  return {
+    idempotencyKey: key,
+    payloadHash: canonicalHash(data),
+    data,
+  };
 }
 
 export function parseSqsWager(body: unknown): SqsWagerMessage {
@@ -23,6 +27,10 @@ export function parseSqsWager(body: unknown): SqsWagerMessage {
   return {
     messageId: envelope.messageId,
     occurredAt: envelope.occurredAt,
-    command: { idempotencyKey, payloadHash: canonicalHash(data), data },
+    command: {
+      idempotencyKey,
+      payloadHash: canonicalHash(data),
+      data,
+    },
   };
 }

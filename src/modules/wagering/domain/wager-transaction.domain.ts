@@ -75,51 +75,67 @@ export class WagerTransaction {
   get id(): string {
     return this.state.id;
   }
+
   get providerId(): string {
     return this.state.providerId;
   }
+
   get externalTransactionId(): string {
     return this.state.externalTransactionId;
   }
+
   get idempotencyKey(): string {
     return this.state.idempotencyKey;
   }
+
   get payloadHash(): string {
     return this.state.payloadHash;
   }
+
   get walletId(): string {
     return this.state.walletId;
   }
+
   get playerId(): string {
     return this.state.playerId;
   }
+
   get roundId(): string {
     return this.state.roundId;
   }
+
   get gameId(): string {
     return this.state.gameId;
   }
+
   get kind(): WagerTransactionKind {
     return this.state.kind;
   }
+
   get money(): Money {
     return this.state.money;
   }
+
   get referenceExternalTransactionId(): string | undefined {
     return this.state.referenceExternalTransactionId;
   }
+
   get referenceTransactionId(): string | undefined {
     return this.state.referenceTransactionId;
   }
+
   get status(): WagerTransactionStatus {
     return this.state.status;
   }
+
   get failureCode(): FailureCode | undefined {
     return this.state.failureCode;
   }
+
   get createdAt(): Date {
     return new Date(this.state.createdAt);
   }
+
   get processedAt(): Date | undefined {
     return this.state.processedAt ? new Date(this.state.processedAt) : undefined;
   }
@@ -127,12 +143,15 @@ export class WagerTransaction {
   isTerminal(): boolean {
     return TERMINAL_STATUSES.includes(this.status);
   }
+
   affectsBalance(): boolean {
     return this.kind !== WagerTransactionKind.Loss;
   }
+
   requiresReference(): boolean {
     return this.kind === WagerTransactionKind.Refund || this.kind === WagerTransactionKind.Rollback;
   }
+
   matchesPayload(hash: string): boolean {
     return this.payloadHash === hash;
   }
@@ -210,15 +229,18 @@ export class WagerTransaction {
       this.state.referenceTransactionId = referenceTransactionId;
     this.state.processedAt = new Date(at);
   }
+
   markPendingReference(): void {
     this.assertMutable();
     this.state.status = WagerTransactionStatus.PendingReference;
   }
+
   reject(code: FailureCode): void {
     this.assertMutable();
     this.state.status = WagerTransactionStatus.Rejected;
     this.state.failureCode = code;
   }
+
   fail(code: FailureCode): void {
     this.assertMutable();
     this.state.status = WagerTransactionStatus.Failed;
@@ -228,6 +250,7 @@ export class WagerTransaction {
   private assertMutable(): void {
     if (this.isTerminal()) throw new DomainError(DOMAIN_ERRORS.INVALID_TRANSACTION_STATE);
   }
+
   private assertAmount(): void {
     // README §6.1 rejects negative input but leaves zero wagers unspecified.
     // Our agreed interpretation accepts zero LOSS; all money-moving kinds are positive.

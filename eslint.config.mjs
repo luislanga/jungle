@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
+import readability, { READABILITY_RULES } from './tooling/eslint/readability.mjs';
 
 export default defineConfig(
   {
@@ -16,6 +17,8 @@ export default defineConfig(
   {
     files: ['**/*.mjs'],
     extends: [js.configs.recommended],
+    plugins: { readability },
+    rules: READABILITY_RULES,
   },
   {
     files: ['src/**/*.ts', 'test/**/*.ts'],
@@ -26,7 +29,9 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    plugins: { readability },
     rules: {
+      ...READABILITY_RULES,
       'no-restricted-imports': ['error', { patterns: ['./*', '../*'] }],
     },
   },

@@ -4,15 +4,23 @@ import { Wallet } from '@/modules/wallet/domain/wallet.domain';
 
 const brl = (amount: string) => Money.from({ amount, currency: 'BRL' });
 const open = (amount = '100') =>
-  Wallet.open({ id: 'wallet', playerId: 'player', initialBalance: brl(amount) });
+  Wallet.open({
+    id: 'wallet',
+    playerId: 'player',
+    initialBalance: brl(amount),
+  });
 
 test('opening starts at version one, including zero opening', () => {
   expect(open().version).toBe(1);
   expect(open().balance.toString()).toBe('100.00');
   expect(open('0').balance.isZero()).toBe(true);
-  expect(() => Wallet.open({ id: 'w', playerId: 'p', initialBalance: brl('1').negate() })).toThrow(
-    'negative',
-  );
+  expect(() =>
+    Wallet.open({
+      id: 'w',
+      playerId: 'p',
+      initialBalance: brl('1').negate(),
+    }),
+  ).toThrow('negative');
 });
 
 test('balance changes increment version; zero movements do not', () => {

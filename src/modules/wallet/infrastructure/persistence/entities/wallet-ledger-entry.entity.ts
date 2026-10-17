@@ -14,16 +14,35 @@ export class WalletLedgerEntryEntity {
   @Column({ name: 'direction', type: 'text' })
   direction!: string;
 
-  @Column({ name: 'amount', type: 'numeric', precision: 20, scale: 2 })
+  @Column({
+    name: 'amount',
+    type: 'numeric',
+    precision: 20,
+    scale: 2,
+  })
   amount!: string;
 
-  @Column({ name: 'currency', type: 'varchar', length: 3 })
+  @Column({
+    name: 'currency',
+    type: 'varchar',
+    length: 3,
+  })
   currency!: string;
 
-  @Column({ name: 'balance_before', type: 'numeric', precision: 20, scale: 2 })
+  @Column({
+    name: 'balance_before',
+    type: 'numeric',
+    precision: 20,
+    scale: 2,
+  })
   balanceBefore!: string;
 
-  @Column({ name: 'balance_after', type: 'numeric', precision: 20, scale: 2 })
+  @Column({
+    name: 'balance_after',
+    type: 'numeric',
+    precision: 20,
+    scale: 2,
+  })
   balanceAfter!: string;
 
   @Column({ name: 'created_at', type: 'timestamptz' })

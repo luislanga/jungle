@@ -34,21 +34,27 @@ export class Wallet {
   get id(): string {
     return this.state.id;
   }
+
   get playerId(): string {
     return this.state.playerId;
   }
+
   get currency(): string {
     return this.state.currency;
   }
+
   get balance(): Money {
     return this.state.balance;
   }
+
   get version(): number {
     return this.state.version;
   }
+
   get createdAt(): Date {
     return new Date(this.state.createdAt);
   }
+
   get updatedAt(): Date {
     return new Date(this.state.updatedAt);
   }

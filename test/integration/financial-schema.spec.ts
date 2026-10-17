@@ -105,14 +105,24 @@ async function movement(f: Fixture, kind: 'BET' | 'REFUND' | 'ROLLBACK', referen
 }
 async function verify(f: Fixture, balance: string, count: number) {
   const rows = await app.query<
-    Array<{ balance: string; version: number; entries: number; consistent: boolean }>
+    Array<{
+      balance: string;
+      version: number;
+      entries: number;
+      consistent: boolean;
+    }>
   >(
     `SELECT w.balance, w.version, count(l.id)::integer AS entries,
     w.balance = coalesce(sum(CASE WHEN l.direction='CREDIT' THEN l.amount ELSE -l.amount END),0) AS consistent
     FROM wagering.wallets w LEFT JOIN wagering.wallet_ledger_entries l ON l.wallet_id=w.id WHERE w.id=$1 GROUP BY w.id`,
     [f.wallet],
   );
-  expect(rows[0]).toEqual({ balance, version: count, entries: count, consistent: true });
+  expect(rows[0]).toEqual({
+    balance,
+    version: count,
+    entries: count,
+    consistent: true,
+  });
 }
 async function failureOf(operation: Promise<unknown>, message?: string) {
   try {
@@ -185,12 +195,38 @@ test('wager uniqueness, valid values, wallet context and original terminal outco
     ['REFUND', '25', 'PENDING'],
     ['BET', '25', 'PROCESSED'],
   ] as const) {
-    await failureOf(insert(crypto.randomUUID(), kind, amount, status));
+    await failureOf(insert(
+      crypto.randomUUID(),
+      kind,
+      amount,
+      status
+    ));
   }
-  await failureOf(insert(crypto.randomUUID(), 'BET', '25', 'PENDING', crypto.randomUUID()));
-  await failureOf(insert(crypto.randomUUID(), 'BET', '25', 'PENDING', f.player, bet));
+  await failureOf(insert(
+    crypto.randomUUID(),
+    'BET',
+    '25',
+    'PENDING',
+    crypto.randomUUID()
+  ));
+  await failureOf(insert(
+    crypto.randomUUID(),
+    'BET',
+    '25',
+    'PENDING',
+    f.player,
+    bet
+  ));
   await failureOf(
-    insert(crypto.randomUUID(), 'BET', '25', 'PENDING', f.player, crypto.randomUUID(), bet),
+    insert(
+      crypto.randomUUID(),
+      'BET',
+      '25',
+      'PENDING',
+      f.player,
+      crypto.randomUUID(),
+      bet
+    ),
   );
   await denied(
     "UPDATE wagering.wager_transactions SET status='PENDING',processed_at=NULL WHERE id=$1",

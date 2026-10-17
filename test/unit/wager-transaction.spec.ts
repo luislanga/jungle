@@ -154,7 +154,11 @@ test('reference validates every required context field but does not add a game r
 
 test('invalid terminal states and reference kinds are rejected', () => {
   for (const status of [Status.Rejected, Status.Failed]) {
-    const state = { ...props(), status, createdAt: new Date() };
+    const state = {
+      ...props(),
+      status,
+      createdAt: new Date(),
+    };
     const ref = WagerTransaction.rehydrate(state);
     expectCode(
       () => dependent(Kind.Refund, ref).validateReference(ref),
@@ -222,7 +226,11 @@ test.each([Status.Pending, Status.PendingReference])(
   '%s can enter every terminal state, which then rejects every transition',
   (status) => {
     for (const terminal of [Status.Processed, Status.Rejected, Status.Failed]) {
-      const tx = WagerTransaction.rehydrate({ ...props(), createdAt: new Date(), status });
+      const tx = WagerTransaction.rehydrate({
+        ...props(),
+        createdAt: new Date(),
+        status,
+      });
       const id = tx.id;
       tx.markPendingReference();
       if (terminal === Status.Processed) tx.markProcessed(undefined, new Date());

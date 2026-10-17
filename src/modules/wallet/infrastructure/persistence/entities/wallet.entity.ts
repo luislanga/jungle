@@ -8,10 +8,19 @@ export class WalletEntity {
   @Column({ name: 'player_id', type: 'uuid' })
   playerId!: string;
 
-  @Column({ name: 'currency', type: 'varchar', length: 3 })
+  @Column({
+    name: 'currency',
+    type: 'varchar',
+    length: 3,
+  })
   currency!: string;
 
-  @Column({ name: 'balance', type: 'numeric', precision: 20, scale: 2 })
+  @Column({
+    name: 'balance',
+    type: 'numeric',
+    precision: 20,
+    scale: 2,
+  })
   balance!: string;
 
   @Column({ name: 'version', type: 'integer' })

@@ -21,12 +21,22 @@ const brl = (amount: string) => Money.from({ amount, currency: 'BRL' });
 const CONTEXT = { correlationId: 'opening-test' };
 async function verify(id: string, balance: string, entries: number) {
   const [row] = await db.app.query<
-    Array<{ balance: string; version: number; count: number; consistent: boolean }>
+    Array<{
+      balance: string;
+      version: number;
+      count: number;
+      consistent: boolean;
+    }>
   >(
     "SELECT w.balance,w.version,count(l.id)::integer AS count,w.balance=coalesce(sum(CASE WHEN l.direction='CREDIT' THEN l.amount ELSE -l.amount END),0) AS consistent FROM wagering.wallets w LEFT JOIN wagering.wallet_ledger_entries l ON l.wallet_id=w.id WHERE w.id=$1 GROUP BY w.id",
     [id],
   );
-  expect(row).toEqual({ balance, version: 1, count: entries, consistent: true });
+  expect(row).toEqual({
+    balance,
+    version: 1,
+    count: entries,
+    consistent: true,
+  });
 }
 
 test('positive opening atomically stores wallet, OPENING, credit ledger and both events', async () => {
@@ -35,11 +45,22 @@ test('positive opening atomically stores wallet, OPENING, credit ledger and both
     CONTEXT,
   );
   await verify(wallet.id, '100.01', 1);
-  const rows = await db.app.query<Array<{ kind: string; status: string; result_balance: string }>>(
-    'SELECT kind,status,result_balance FROM wagering.wager_transactions WHERE wallet_id=$1',
-    [wallet.id],
-  );
-  expect(rows).toEqual([{ kind: 'OPENING', status: 'PROCESSED', result_balance: '100.01' }]);
+  const rows = await db.app.query<
+    Array<{
+      kind: string;
+      status: string;
+      result_balance: string;
+    }>
+  >('SELECT kind,status,result_balance FROM wagering.wager_transactions WHERE wallet_id=$1', [
+    wallet.id,
+  ]);
+  expect(rows).toEqual([
+    {
+      kind: 'OPENING',
+      status: 'PROCESSED',
+      result_balance: '100.01',
+    },
+  ]);
   const events = await db.app.query<Array<{ event_type: string }>>(
     'SELECT event_type FROM wagering.outbox_messages WHERE aggregate_id=$1 ORDER BY event_type',
     [wallet.id],

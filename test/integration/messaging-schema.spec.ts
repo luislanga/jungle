@@ -156,7 +156,12 @@ test('messaging migrations roll back and reapply without touching financial tabl
   >(
     "SELECT to_regclass('wagering.inbox_messages')::text AS inbox,to_regclass('wagering.outbox_messages')::text AS outbox,to_regclass('wagering.pending_reference_work')::text AS work,to_regclass('wagering.wallets')::text AS wallets",
   );
-  expect(row).toEqual({ inbox: null, outbox: null, work: null, wallets: 'wagering.wallets' });
+  expect(row).toEqual({
+    inbox: null,
+    outbox: null,
+    work: null,
+    wallets: 'wagering.wallets',
+  });
   await db.run(['run', '--rm', 'migrations', 'update']);
   await enqueue(await wallet());
 }, 60_000);

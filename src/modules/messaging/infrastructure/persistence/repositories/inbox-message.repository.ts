@@ -8,6 +8,7 @@ import { DOMAIN_ERRORS } from '@/shared/errors/errors.constant';
 
 export class InboxMessageRepository {
   constructor(private readonly manager: EntityManager) {}
+
   async receive(message: InboxMessage): Promise<InboxMessage> {
     requireTransaction(this.manager);
     // ON CONFLICT waits for a concurrent insert without aborting this transaction.
@@ -32,6 +33,7 @@ export class InboxMessageRepository {
       throw new DomainError(DOMAIN_ERRORS.INBOX_PAYLOAD_CONFLICT);
     return stored;
   }
+
   async save(message: InboxMessage): Promise<void> {
     requireTransaction(this.manager);
     await this.manager

@@ -9,6 +9,7 @@ export class WalletMapper {
       balance: Money.from({ amount: row.balance, currency: row.currency }),
     });
   }
+
   static toPersistence(wallet: Wallet): WalletEntity {
     return Object.assign(new WalletEntity(), {
       id: wallet.id,

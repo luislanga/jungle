@@ -122,7 +122,12 @@ export class ProcessWagerTransactionUseCase {
       const expired =
         claim.expiresAt.getTime() <= Date.now() ||
         claim.attempts + 1 >= this.pendingConfig.PENDING_REFERENCE_MAX_ATTEMPTS;
-      const result = await this.apply(manager, stored.transaction, context, expired);
+      const result = await this.apply(
+        manager,
+        stored.transaction,
+        context,
+        expired
+      );
       const valid =
         result.status === WagerTransactionStatus.PendingReference
           ? await work.scheduleRetry(
@@ -209,7 +214,11 @@ export class ProcessWagerTransactionUseCase {
       await wallets.save(wallet);
     }
     const outbox = new OutboxMessageRepository(manager);
-    const eventContext = { ...context, occurredAt: at, eventId: crypto.randomUUID() };
+    const eventContext = {
+      ...context,
+      occurredAt: at,
+      eventId: crypto.randomUUID(),
+    };
     if (tx.status === WagerTransactionStatus.PendingReference && !wasPending) {
       await new PendingReferenceWorkRepository(manager).schedule(
         tx.id,

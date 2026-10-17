@@ -6,6 +6,7 @@ import { requireTransaction } from '@/database/require-transaction.util';
 
 export class WalletRepository {
   constructor(private readonly manager: EntityManager) {}
+
   async findById(id: string, lock = false): Promise<Wallet | null> {
     const query = this.manager
       .getRepository(WalletEntity)
@@ -20,10 +21,12 @@ export class WalletRepository {
     const row = await query.getOne();
     return row ? WalletMapper.toDomain(row) : null;
   }
+
   async insert(wallet: Wallet): Promise<void> {
     requireTransaction(this.manager);
     await this.manager.getRepository(WalletEntity).insert(WalletMapper.toPersistence(wallet));
   }
+
   async save(wallet: Wallet): Promise<void> {
     requireTransaction(this.manager);
     await this.manager.getRepository(WalletEntity).update(wallet.id, {

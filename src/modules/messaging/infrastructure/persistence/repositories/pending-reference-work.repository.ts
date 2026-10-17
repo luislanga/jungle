@@ -8,12 +8,17 @@ import type {
 
 export class PendingReferenceWorkRepository {
   constructor(private readonly manager: EntityManager) {}
+
   async schedule(transactionId: string, expiresAt: Date, nextAttemptAt: Date): Promise<void> {
     requireTransaction(this.manager);
-    await this.manager
-      .getRepository(PendingReferenceWorkEntity)
-      .insert({ transactionId, expiresAt, nextAttemptAt, attempts: 0 });
+    await this.manager.getRepository(PendingReferenceWorkEntity).insert({
+      transactionId,
+      expiresAt,
+      nextAttemptAt,
+      attempts: 0,
+    });
   }
+
   async claimDue(options: WorkClaimOptions): Promise<PendingReferenceClaim[]> {
     requireTransaction(this.manager);
     const token = crypto.randomUUID();
@@ -33,6 +38,7 @@ export class PendingReferenceWorkRepository {
       [options.limit, options.owner, token, options.leaseMs],
     );
   }
+
   async findClaim(
     transactionId: string,
     token: string,
@@ -48,6 +54,7 @@ export class PendingReferenceWorkRepository {
       .setLock('pessimistic_write')
       .getOne();
   }
+
   async complete(transactionId: string, token: string): Promise<boolean> {
     requireTransaction(this.manager);
     const rows = await this.manager.query<Array<{ transaction_id: string }>>(
@@ -59,6 +66,7 @@ export class PendingReferenceWorkRepository {
     );
     return rows.length === 1;
   }
+
   async scheduleRetry(transactionId: string, token: string, nextAttemptAt: Date): Promise<boolean> {
     requireTransaction(this.manager);
     const rows = await this.manager.query<Array<{ transaction_id: string }>>(

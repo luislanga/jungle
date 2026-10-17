@@ -56,7 +56,12 @@ export async function startPostgresTest() {
     });
     await app.initialize();
     await owner.initialize();
-    return { app, owner, run, close };
+    return {
+      app,
+      owner,
+      run,
+      close,
+    };
   } catch (error) {
     await close();
     throw error;

@@ -11,6 +11,7 @@ export class InboxMessageMapper {
       ...(row.processedAt === null ? {} : { processedAt: row.processedAt }),
     });
   }
+
   static toPersistence(message: InboxMessage): InboxMessageEntity {
     return Object.assign(new InboxMessageEntity(), {
       consumerName: message.consumerName,

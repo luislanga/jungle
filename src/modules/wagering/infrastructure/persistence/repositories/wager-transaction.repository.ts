@@ -9,6 +9,7 @@ import type { StoredWager } from '@/shared/interfaces/wager-persistence.interfac
 
 export class WagerTransactionRepository {
   constructor(private readonly manager: EntityManager) {}
+
   async findById(id: string, lock = false): Promise<StoredWager | null> {
     const query = this.manager
       .getRepository(WagerTransactionEntity)
@@ -21,6 +22,7 @@ export class WagerTransactionRepository {
     const row = await query.getOne();
     return row ? WagerTransactionMapper.toStored(row) : null;
   }
+
   async findByKey(idempotencyKey: string, lock = false): Promise<StoredWager | null> {
     const query = this.manager
       .getRepository(WagerTransactionEntity)
@@ -33,15 +35,19 @@ export class WagerTransactionRepository {
     const row = await query.getOne();
     return row ? WagerTransactionMapper.toStored(row) : null;
   }
+
   async findByExternalId(
     providerId: string,
     externalTransactionId: string,
   ): Promise<StoredWager | null> {
-    const row = await this.manager
-      .getRepository(WagerTransactionEntity)
-      .findOneBy({ providerId, externalTransactionId, kind: Not(WagerTransactionKind.Opening) });
+    const row = await this.manager.getRepository(WagerTransactionEntity).findOneBy({
+      providerId,
+      externalTransactionId,
+      kind: Not(WagerTransactionKind.Opening),
+    });
     return row ? WagerTransactionMapper.toStored(row) : null;
   }
+
   async processedReversalKinds(referenceTransactionId: string): Promise<WagerTransactionKind[]> {
     const rows = await this.manager.getRepository(WagerTransactionEntity).find({
       select: { kind: true },
@@ -49,12 +55,14 @@ export class WagerTransactionRepository {
     });
     return rows.map((row) => row.kind as WagerTransactionKind);
   }
+
   async insert(tx: WagerTransaction, resultBalance: Money | null = null): Promise<void> {
     requireTransaction(this.manager);
     await this.manager
       .getRepository(WagerTransactionEntity)
       .insert(WagerTransactionMapper.toPersistence(tx, resultBalance));
   }
+
   async insertIfAbsent(tx: WagerTransaction): Promise<void> {
     requireTransaction(this.manager);
     // A uniqueness race must not abort the transaction before we inspect the winner.
@@ -66,6 +74,7 @@ export class WagerTransactionRepository {
       .orIgnore()
       .execute();
   }
+
   async save(tx: WagerTransaction, resultBalance: Money): Promise<void> {
     requireTransaction(this.manager);
     await this.manager.getRepository(WagerTransactionEntity).update(tx.id, {

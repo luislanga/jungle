@@ -14,7 +14,11 @@ afterAll(async () => {
   await db?.close();
 }, 30_000);
 const PAYLOAD_HASH = 'a'.repeat(64);
-const CLAIM_OPTIONS = { owner: 'worker', limit: 2, leaseMs: 30_000 };
+const CLAIM_OPTIONS = {
+  owner: 'worker',
+  limit: 2,
+  leaseMs: 30_000,
+};
 async function zeroWallet() {
   const id = crypto.randomUUID();
   const playerId = crypto.randomUUID();

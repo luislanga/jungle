@@ -42,10 +42,12 @@ function assertStatus(tx: WagerTransaction, status: WagerTransactionStatus): voi
 export class WagerTransactionProcessed extends IntegrationEvent<WagerTransactionProcessedData> {
   readonly eventType = 'WagerTransactionProcessed';
   readonly version = 1;
+
   private constructor(props: IntegrationEventProps<WagerTransactionProcessedData>) {
     super(props);
     Object.freeze(this);
   }
+
   static from(tx: WagerTransaction, balance: Money, ctx: EventContext): WagerTransactionProcessed {
     assertStatus(tx, WagerTransactionStatus.Processed);
     return new WagerTransactionProcessed({
@@ -58,16 +60,22 @@ export class WagerTransactionProcessed extends IntegrationEvent<WagerTransaction
 export class WagerTransactionRejected extends IntegrationEvent<WagerTransactionRejectedData> {
   readonly eventType = 'WagerTransactionRejected';
   readonly version = 1;
+
   private constructor(props: IntegrationEventProps<WagerTransactionRejectedData>) {
     super(props);
     Object.freeze(this);
   }
+
   static from(tx: WagerTransaction, balance: Money, ctx: EventContext): WagerTransactionRejected {
     assertStatus(tx, WagerTransactionStatus.Rejected);
     if (!tx.failureCode) throw new DomainError(DOMAIN_ERRORS.MISSING_FAILURE_CODE);
     return new WagerTransactionRejected({
       ...metadata(tx.walletId, ctx),
-      data: { ...transactionData(tx), failureCode: tx.failureCode, balance: balance.toJSON() },
+      data: {
+        ...transactionData(tx),
+        failureCode: tx.failureCode,
+        balance: balance.toJSON(),
+      },
     });
   }
 }
@@ -75,10 +83,12 @@ export class WagerTransactionRejected extends IntegrationEvent<WagerTransactionR
 export class WagerTransactionPendingReference extends IntegrationEvent<WagerTransactionPendingReferenceData> {
   readonly eventType = 'WagerTransactionPendingReference';
   readonly version = 1;
+
   private constructor(props: IntegrationEventProps<WagerTransactionPendingReferenceData>) {
     super(props);
     Object.freeze(this);
   }
+
   static from(tx: WagerTransaction, ctx: EventContext): WagerTransactionPendingReference {
     assertStatus(tx, WagerTransactionStatus.PendingReference);
     if (!tx.referenceExternalTransactionId)
@@ -96,10 +106,12 @@ export class WagerTransactionPendingReference extends IntegrationEvent<WagerTran
 export class WalletBalanceChanged extends IntegrationEvent<WalletBalanceChangedData> {
   readonly eventType = 'WalletBalanceChanged';
   readonly version = 1;
+
   private constructor(props: IntegrationEventProps<WalletBalanceChangedData>) {
     super(props);
     Object.freeze(this);
   }
+
   static from(wallet: Wallet, entry: WalletLedgerEntry, ctx: EventContext): WalletBalanceChanged {
     if (
       wallet.id !== entry.walletId ||

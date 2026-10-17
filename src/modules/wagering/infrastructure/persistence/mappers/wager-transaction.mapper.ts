@@ -34,6 +34,7 @@ export class WagerTransactionMapper {
       ...(row.processedAt === null ? {} : { processedAt: row.processedAt }),
     });
   }
+
   static toStored(row: WagerTransactionEntity): StoredWager {
     return {
       transaction: this.toDomain(row),
@@ -43,6 +44,7 @@ export class WagerTransactionMapper {
           : Money.from({ amount: row.resultBalance, currency: row.currency }),
     };
   }
+
   static toPersistence(tx: WagerTransaction, resultBalance: Money | null): WagerTransactionEntity {
     return Object.assign(new WagerTransactionEntity(), {
       id: tx.id,

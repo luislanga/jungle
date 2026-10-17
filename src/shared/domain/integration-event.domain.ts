@@ -19,18 +19,23 @@ export abstract class IntegrationEvent<Data> {
   get eventId(): string {
     return this.props.eventId;
   }
+
   get aggregateId(): string {
     return this.props.aggregateId;
   }
+
   get correlationId(): string {
     return this.props.correlationId;
   }
+
   get causationId(): string | undefined {
     return this.props.causationId;
   }
+
   get occurredAt(): Date {
     return new Date(this.props.occurredAt);
   }
+
   get data(): Readonly<Data> {
     return this.props.data;
   }

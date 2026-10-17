@@ -14,12 +14,24 @@ export class PendingReferenceWorkEntity {
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ name: 'claim_owner', type: 'text', nullable: true })
+  @Column({
+    name: 'claim_owner',
+    type: 'text',
+    nullable: true,
+  })
   claimOwner!: string | null;
 
-  @Column({ name: 'claim_token', type: 'uuid', nullable: true })
+  @Column({
+    name: 'claim_token',
+    type: 'uuid',
+    nullable: true,
+  })
   claimToken!: string | null;
 
-  @Column({ name: 'claim_until', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'claim_until',
+    type: 'timestamptz',
+    nullable: true,
+  })
   claimUntil!: Date | null;
 }

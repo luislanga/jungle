@@ -30,24 +30,31 @@ export class WalletLedgerEntry {
   get id(): string {
     return this.state.id;
   }
+
   get walletId(): string {
     return this.state.walletId;
   }
+
   get transactionId(): string {
     return this.state.transactionId;
   }
+
   get direction(): LedgerDirection {
     return this.state.direction;
   }
+
   get money(): Money {
     return this.state.money;
   }
+
   get balanceBefore(): Money {
     return this.state.balanceBefore;
   }
+
   get balanceAfter(): Money {
     return this.state.balanceAfter;
   }
+
   get createdAt(): Date {
     return new Date(this.state.createdAt);
   }

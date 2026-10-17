@@ -9,6 +9,7 @@ const DEFAULT_RETRY_MAX_DELAY_MS = 60_000;
 
 export class OutboxMessage {
   private constructor(private readonly state: OutboxState) {}
+
   static enqueue(event: IntegrationEvent<unknown>): OutboxMessage {
     return OutboxMessage.rehydrate({
       id: event.eventId,
@@ -19,6 +20,7 @@ export class OutboxMessage {
       attempts: 0,
     });
   }
+
   static rehydrate(state: OutboxState): OutboxMessage {
     return new OutboxMessage({
       ...state,
@@ -28,39 +30,51 @@ export class OutboxMessage {
       ...(state.publishedAt ? { publishedAt: new Date(state.publishedAt) } : {}),
     });
   }
+
   get id(): string {
     return this.state.id;
   }
+
   get aggregateId(): string {
     return this.state.aggregateId;
   }
+
   get eventType(): string {
     return this.state.eventType;
   }
+
   get payload(): EventEnvelope {
     return structuredClone(this.state.payload);
   }
+
   get occurredAt(): Date {
     return new Date(this.state.occurredAt);
   }
+
   get attempts(): number {
     return this.state.attempts;
   }
+
   get nextAttemptAt(): Date | undefined {
     return this.state.nextAttemptAt ? new Date(this.state.nextAttemptAt) : undefined;
   }
+
   get publishedAt(): Date | undefined {
     return this.state.publishedAt ? new Date(this.state.publishedAt) : undefined;
   }
+
   isPending(): boolean {
     return this.state.publishedAt === undefined;
   }
+
   isDue(now: Date): boolean {
     return this.isPending() && (!this.state.nextAttemptAt || this.state.nextAttemptAt <= now);
   }
+
   markPublished(at: Date): void {
     if (this.isPending()) this.state.publishedAt = new Date(at);
   }
+
   scheduleRetry(
     now: Date,
     baseDelayMs = DEFAULT_RETRY_BASE_DELAY_MS,

@@ -32,7 +32,11 @@ function event() {
 test('Inbox identity uses consumer and envelope ID; processing preserves its original time', () => {
   const time = new Date(at);
   const inbox = InboxMessage.receive(
-    { messageId: 'envelope-id', consumerName: 'wager-worker', payloadHash: 'hash' },
+    {
+      messageId: 'envelope-id',
+      consumerName: 'wager-worker',
+      payloadHash: 'hash',
+    },
     time,
   );
   expect(inbox.isProcessed()).toBe(false);
@@ -60,13 +64,28 @@ test('Outbox retains event identity and uses deterministic bounded exponential r
   expect(outbox.id).toBe(source.eventId);
   expect(outbox.payload.eventId).toBe('stable-id');
   expect(outbox.isDue(at)).toBe(true);
-  outbox.scheduleRetry(at, 1000, 2000, () => 0.5);
+  outbox.scheduleRetry(
+    at,
+    1000,
+    2000,
+    () => 0.5
+  );
   expect(outbox.attempts).toBe(1);
   expect(outbox.nextAttemptAt?.getTime()).toBe(at.getTime() + 500);
   expect(outbox.isDue(at)).toBe(false);
   expect(outbox.isDue(new Date(at.getTime() + 500))).toBe(true);
-  outbox.scheduleRetry(at, 1000, 2000, () => 0.5);
-  outbox.scheduleRetry(at, 1000, 2000, () => 0.5);
+  outbox.scheduleRetry(
+    at,
+    1000,
+    2000,
+    () => 0.5
+  );
+  outbox.scheduleRetry(
+    at,
+    1000,
+    2000,
+    () => 0.5
+  );
   expect(outbox.nextAttemptAt?.getTime()).toBe(at.getTime() + 1000);
   expect(outbox.id).toBe('stable-id');
   const payload = outbox.payload;

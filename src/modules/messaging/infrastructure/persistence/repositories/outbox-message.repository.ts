@@ -7,6 +7,7 @@ import type { ClaimedOutbox, WorkClaimOptions } from '@/shared/interfaces/messag
 
 export class OutboxMessageRepository {
   constructor(private readonly manager: EntityManager) {}
+
   async enqueue(message: OutboxMessage): Promise<void> {
     requireTransaction(this.manager);
     await this.manager.query(
@@ -25,6 +26,7 @@ export class OutboxMessageRepository {
       ],
     );
   }
+
   async claimDue(options: WorkClaimOptions): Promise<ClaimedOutbox[]> {
     requireTransaction(this.manager);
     const token = crypto.randomUUID();
@@ -49,6 +51,7 @@ export class OutboxMessageRepository {
       .findBy({ id: In(ids.map((row) => row.id)) });
     return rows.map((row) => ({ message: OutboxMessageMapper.toDomain(row), token }));
   }
+
   async markPublished(id: string, token: string): Promise<boolean> {
     requireTransaction(this.manager);
     const rows = await this.manager.query<Array<{ id: string }>>(
@@ -60,6 +63,7 @@ export class OutboxMessageRepository {
     );
     return rows.length === 1;
   }
+
   async scheduleRetry(id: string, token: string, nextAttemptAt: Date): Promise<boolean> {
     requireTransaction(this.manager);
     const rows = await this.manager.query<Array<{ id: string }>>(

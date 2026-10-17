@@ -15,7 +15,11 @@ const PROBE_ENTITY = new EntitySchema<NumericProbe>({
   tableName: 'numeric_probe',
   columns: {
     id: { type: 'uuid', primary: true },
-    amount: { type: 'numeric', precision: 20, scale: 2 },
+    amount: {
+      type: 'numeric',
+      precision: 20,
+      scale: 2,
+    },
   },
 });
 
@@ -232,13 +236,21 @@ test('transaction callback shares one manager and rolls back all writes on error
 test('timeouts and READ COMMITTED are transaction-local', async () => {
   await withTransaction(application, transactionSettings, async (manager) => {
     const settings = await manager.query<
-      Array<{ isolation: string; lock: string; timeout: string }>
+      Array<{
+        isolation: string;
+        lock: string;
+        timeout: string;
+      }>
     >(
       `SELECT current_setting('transaction_isolation') AS isolation,
               current_setting('lock_timeout') AS lock,
               current_setting('transaction_timeout') AS timeout`,
     );
-    expect(settings[0]).toEqual({ isolation: 'read committed', lock: '2s', timeout: '5s' });
+    expect(settings[0]).toEqual({
+      isolation: 'read committed',
+      lock: '2s',
+      timeout: '5s',
+    });
   });
   const outside = await application.query<Array<{ timeout: string }>>(
     "SELECT current_setting('lock_timeout') AS timeout",

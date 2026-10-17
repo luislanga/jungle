@@ -15,7 +15,11 @@ import { Money } from '@/shared/domain/money.domain';
 
 const brl = (amount: string) => Money.from({ amount, currency: 'BRL' });
 const at = new Date('2026-01-01T00:00:00Z');
-const context = { eventId: 'stable-event', correlationId: 'correlation', occurredAt: at };
+const context = {
+  eventId: 'stable-event',
+  correlationId: 'correlation',
+  occurredAt: at,
+};
 function transaction(kind = Kind.Loss) {
   return WagerTransaction.create({
     id: 'tx',
@@ -85,7 +89,11 @@ test('rejection and pending-reference event types carry their specific reasons',
 });
 
 test('wallet event represents a real movement and its current version', () => {
-  const wallet = Wallet.open({ id: 'wallet', playerId: 'player', initialBalance: brl('100') });
+  const wallet = Wallet.open({
+    id: 'wallet',
+    playerId: 'player',
+    initialBalance: brl('100'),
+  });
   wallet.debit(brl('25'));
   const state = {
     id: 'entry',

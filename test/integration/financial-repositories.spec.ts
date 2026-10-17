@@ -25,7 +25,11 @@ afterAll(async () => {
 const PAYLOAD_HASH = 'a'.repeat(64);
 const brl = (amount = '0') => Money.from({ amount, currency: 'BRL' });
 const wallet = () =>
-  Wallet.open({ id: crypto.randomUUID(), playerId: crypto.randomUUID(), initialBalance: brl() });
+  Wallet.open({
+    id: crypto.randomUUID(),
+    playerId: crypto.randomUUID(),
+    initialBalance: brl(),
+  });
 function props(w: Wallet, kind = Kind.Loss) {
   const id = crypto.randomUUID();
   return {
