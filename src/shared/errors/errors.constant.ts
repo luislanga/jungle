@@ -80,6 +80,26 @@ export const DOMAIN_ERRORS = {
     code: 'INVALID_AMOUNT',
     message: 'Only LOSS may have a zero amount; negative inputs are not accepted',
   },
+  EVENT_TRANSACTION_STATE_MISMATCH: {
+    code: 'INVALID_TRANSACTION_STATE',
+    message: 'Event must match the persisted transaction outcome',
+  },
+  MISSING_FAILURE_CODE: {
+    code: 'MISSING_FAILURE_CODE',
+    message: 'Rejected event needs a failure code',
+  },
+  PENDING_EVENT_REFERENCE_REQUIRED: {
+    code: 'REFERENCE_REQUIRED',
+    message: 'Pending reference event needs a reference',
+  },
+  INVALID_BALANCE_EVENT: {
+    code: 'INVALID_BALANCE_EVENT',
+    message: 'Balance event must describe the wallet movement',
+  },
+  INVALID_OUTBOX_STATE: {
+    code: 'INVALID_OUTBOX_STATE',
+    message: 'Published events cannot be retried',
+  },
 } as const;
 
 export type DomainErrorDefinition = (typeof DOMAIN_ERRORS)[keyof typeof DOMAIN_ERRORS];
