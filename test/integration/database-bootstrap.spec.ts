@@ -33,6 +33,9 @@ const env = {
 let migrator: DataSource;
 let application: DataSource;
 let transactionSettings: DatabaseConfig;
+const migrationCount = Array.from(
+  new Bun.Glob('*.sql').scanSync({ cwd: 'database/changelog/changes' }),
+).length;
 
 async function run(args: string[]): Promise<string> {
   const result = await compose(project, env, args);
@@ -99,7 +102,8 @@ afterAll(async () => {
 test('complete environment starts only after healthy PostgreSQL and successful Liquibase', async () => {
   expect(application.options.synchronize).toBe(false);
   const history = await migrator.query<Array<{ id: string }>>('SELECT id FROM databasechangelog');
-  expect(history).toEqual([{ id: '001-initialize-schema' }]);
+  expect(history).toContainEqual({ id: '001-initialize-schema' });
+  expect(history).toHaveLength(migrationCount);
   expect(await run(['run', '--rm', '--no-deps', 'migrations', '--version'])).toContain('5.0.4');
   const queueSetup = JSON.parse(await run(['ps', '--all', '--format', 'json', 'queue-init'])) as {
     State: string;
@@ -134,7 +138,14 @@ test('explicit SQL rollback and reapply work against PostgreSQL', async () => {
   await run(['stop', 'app', 'app2', 'app3']);
   await migrator.query('DROP TABLE wagering.numeric_probe');
   try {
-    await run(['run', '--rm', '--no-deps', 'migrations', 'rollback-count', '--count=1']);
+    await run([
+      'run',
+      '--rm',
+      '--no-deps',
+      'migrations',
+      'rollback-count',
+      `--count=${migrationCount}`,
+    ]);
     const absent = await migrator.query<Array<{ schema: string | null }>>(
       "SELECT to_regnamespace('wagering')::text AS schema",
     );
@@ -145,7 +156,7 @@ test('explicit SQL rollback and reapply work against PostgreSQL', async () => {
     await run(['up', '--detach']);
   }
   const restored = await migrator.query<unknown[]>('SELECT id FROM databasechangelog');
-  expect(restored).toHaveLength(1);
+  expect(restored).toHaveLength(migrationCount);
 }, 60_000);
 
 test('failed migration blocks app startup and rolls back its partial SQL', async () => {
