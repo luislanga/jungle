@@ -117,6 +117,10 @@ export const DOMAIN_ERRORS = {
 export type DomainErrorDefinition = (typeof DOMAIN_ERRORS)[keyof typeof DOMAIN_ERRORS];
 
 export const APPLICATION_ERRORS = {
+  INVALID_LEDGER_CURSOR: {
+    code: 'INVALID_LEDGER_CURSOR',
+    message: 'Invalid ledger cursor for this wallet',
+  },
   TRANSACTION_NOT_FOUND: { code: 'TRANSACTION_NOT_FOUND', message: 'Transaction was not found' },
   WALLET_NOT_FOUND: { code: 'WALLET_NOT_FOUND', message: 'Wallet was not found' },
   INVALID_WALLET_CONTEXT: {

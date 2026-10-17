@@ -1,0 +1,4 @@
+export const DEFAULT_LEDGER_LIMIT = 50;
+export const MAX_LEDGER_LIMIT = 200;
+export const MAX_LEDGER_CURSOR_LENGTH = 2048;
+export const LEDGER_CURSOR_VERSION = 1;

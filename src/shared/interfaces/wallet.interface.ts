@@ -32,3 +32,27 @@ export interface OpenWalletInput {
   playerId: string;
   initialBalance: Money;
 }
+
+export interface LedgerCursor {
+  version: 1;
+  walletId: string;
+  createdAt: string;
+  id: string;
+}
+
+export interface LedgerQueryRow {
+  id: string;
+  transaction_id: string;
+  direction: LedgerDirection;
+  amount: string;
+  currency: string;
+  balance_before: string;
+  balance_after: string;
+  created_at: string;
+}
+
+export interface LedgerPage {
+  walletId: string;
+  entries: LedgerQueryRow[];
+  nextCursor: string | null;
+}

@@ -6,6 +6,7 @@ export const ENDPOINTS = {
 
 export const WALLET_ROUTES = {
   WALLET_BY_ID: ':walletId', // /wallets/:walletId
+  WALLET_LEDGER: ':walletId/ledger', // /wallets/:walletId/ledger
 } as const;
 
 export const WAGER_ROUTES = {
