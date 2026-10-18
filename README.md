@@ -1,27 +1,72 @@
 # Distributed Wagering Processor
 
-NestJS + Bun, PostgreSQL/TypeORM, Liquibase and SQS through LocalStack. Three application instances share the same financial transaction path and durable Inbox/Outbox.
+Minha implementação do desafio backend da Jungle Gaming.
 
-## Run everything
+O serviço recebe transações de apostas por HTTP ou SQS e atualiza a carteira do jogador. A mesma operação pode chegar mais de uma vez, e várias instâncias podem tentar atualizar a mesma carteira ao mesmo tempo. O saldo e o ledger precisam continuar corretos nos dois casos.
 
-Requires Docker Engine with Compose v2. For local development and tests, use Bun **1.4.3**.
+## Stack
+
+- NestJS e TypeScript
+- Bun 1.4.3
+- TypeORM e PostgreSQL
+- Liquibase com migrations SQL
+- AWS SQS via LocalStack
+- Docker Compose
+
+## Executar com Docker
+
+### Requisitos
+
+- Docker Engine.
+- Docker Compose.
+- Bun 1.4.3 (opcional, para rodar em modo de desenvolvimento)
+
+Na primeira execução, copie o arquivo de exemplo das variáveis de ambiente:
 
 ```sh
 cp .env.example .env
+```
+
+Depois, suba o projeto:
+
+```sh
 docker compose up --build
 ```
 
-Compose starts PostgreSQL, runs Liquibase, creates the queues, then starts three applications. HTTP ports are **3000**, **3001** and **3002**. PostgreSQL is **5432**; LocalStack is **4566**. Ports bind to localhost.
+Inicialização do compose:
+
+- Inicia o PostgreSQL e aguarda o banco ficar disponível.
+- Roda as migrations.
+- Inicia o LocalStack e cria as filas.
+- Inicia três instâncias da aplicação.
+
+Os endereços padrão são:
+
+- Primeira instância: `http://localhost:3000`
+- Segunda instância: `http://localhost:3001`
+- Terceira instância: `http://localhost:3002`
+- PostgreSQL: `localhost:5432`
+- LocalStack: `http://localhost:4566`
+
+As três instâncias compartilham o banco e as filas. Cada uma atende requisições HTTP e executa os workers em segundo plano.
+
+Para verificar se a primeira instância está pronta:
 
 ```sh
-curl http://localhost:3000/health/live
 curl http://localhost:3000/health/ready
-curl http://localhost:3000/metrics
 ```
 
-The database must be healthy and migrations/queue creation must succeed before applications start. `docker compose down` stops the environment and keeps PostgreSQL data. LocalStack queues are in memory and do not survive container recreation.
+Para parar o projeto:
 
-## Run Bun locally
+```sh
+docker compose down
+```
+
+O PostgreSQL mantém os dados em um volume do Docker. Excluir o container não apaga o banco nem o histórico de migrations. Nesta configuração, as filas do LocalStack ficam em memória, portanto, recriar o LocalStack apaga as mensagens que estavam nas filas.
+
+## Executar a aplicação localmente
+
+Para executar o Bun na sua máquina e manter PostgreSQL e LocalStack no Docker:
 
 ```sh
 bun install --frozen-lockfile
@@ -30,11 +75,17 @@ bun run migration:up
 bun run start:dev
 ```
 
-This runs PostgreSQL and LocalStack in Docker, with the application running on your computer. Stop Compose application containers first if they already occupy port 3000: `docker compose stop app app2 app3`.
+Se os containers da aplicação já estiverem rodando, pare-os primeiro para liberar a porta 3000:
 
-For DBeaver: host `localhost`, port `5432`, database `wagering`, schema `wagering`, user `wager_app`, password `local-app` (the `.env.example` defaults). The runtime role deliberately cannot modify/delete ledger history. `wager_migrator` owns migrations; `postgres` is the local administrator.
+```sh
+docker compose stop app app2 app3
+```
 
-## Try a wallet
+O arquivo `.env` de exemplo usa `localhost` para esse modo. Ao executar as aplicações nos containers, o Compose fornece os endereços internos.
+
+## Testar uma requisição
+
+Crie uma carteira com R$ 100:
 
 ```sh
 curl -X POST http://localhost:3000/wallets \
@@ -42,28 +93,127 @@ curl -X POST http://localhost:3000/wallets \
   -d '{"playerId":"0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1","initialBalance":{"amount":"100.00","currency":"BRL"}}'
 ```
 
-Copy the returned wallet ID into the wager examples in the original specification below. Send a unique `Idempotency-Key` header; retry the same request with the same key after an uncertain response. Amounts are decimal **strings**; this deployment accepts BRL.
-
-## Verify
+Copie o ID da carteira retornado na resposta:
 
 ```sh
-bun run check          # formatting, ESLint and strict TypeScript
-bun run build          # production output with resolved imports
-bun run test           # unit and Nest smoke tests
+export WALLET_ID='id-da-sua-carteira'
+```
+
+Envie uma aposta de R$ 25:
+
+```sh
+curl -i -X POST http://localhost:3000/wagering/transactions \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: demo:bet-1' \
+  --data-binary @- <<JSON
+{
+  "providerId": "demo",
+  "externalTransactionId": "bet-1",
+  "playerId": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+  "walletId": "$WALLET_ID",
+  "roundId": "round-1",
+  "gameId": "demo-game",
+  "kind": "BET",
+  "money": {"amount": "25.00", "currency": "BRL"}
+}
+JSON
+```
+
+O saldo deve ficar em `75.00`. Reenviar a mesma requisição com a mesma chave deve retornar o resultado salvo com `idempotentReplay: true`, sem debitar novamente.
+
+Alguns detalhes:
+
+- Valores monetários são strings decimais, não números.
+- Esta configuração aceita BRL.
+- Novas operações precisam de novas chaves de idempotência e IDs externos de transação.
+- Criar outra carteira para o mesmo jogador e moeda retorna conflito. Use outro ID de jogador se quiser repetir o exemplo do início.
+
+Para comparar o saldo com o ledger, execute a reconciliação:
+
+```sh
+curl -X POST "http://localhost:3000/wallets/$WALLET_ID/reconciliation"
+```
+
+A reconciliação informa divergências. Ela não altera o saldo nem o ledger para corrigi-las.
+
+## Migrations
+
+A inicialização pelo Docker já executa as migrations. Para executá-las separadamente:
+
+```sh
+bun run migration:up
+bun run migration:status
+```
+
+Para desfazer o último changeset:
+
+```sh
+bun run migration:down
+```
+
+Execute o rollback em um banco local ou descartável, com as aplicações paradas. Dependendo do changeset, ele pode excluir uma tabela.
+
+## Testes
+
+Verificações de formatação, lint e TypeScript:
+
+```sh
+bun run check
+```
+
+Testes unitários e testes básicos de inicialização do Nest:
+
+```sh
+bun run test
+```
+
+As demais suítes usam containers reais de PostgreSQL e LocalStack. O Docker precisa estar rodando e acessível ao seu usuário.
+
+- Integração verifica API, schema, transações e processamento das filas.
+- Concorrência verifica requisições duplicadas e operações simultâneas entre vários processos.
+- Recuperação encerra processos e interrompe dependências para verificar o que permanece após uma reinicialização.
+
+```sh
 bun run test:integration
 bun run test:concurrency
 bun run test:recovery
-# Or run everything:
+```
+
+Os testes criam projetos Compose separados e volumes descartáveis. Eles não apagam o banco de desenvolvimento.
+
+Para executar todas as verificações, compilar a aplicação e rodar todas as suítes:
+
+```sh
 bun run verify
 ```
 
-Container-backed tests need access to the Docker Engine socket. They create isolated Compose projects, random ports and disposable volumes; they do not reset the development database. Recovery tests deliberately kill their own worker processes and pause their own dependencies.
+## Consultar o ambiente
 
-[Operations and API behavior](docs/OPERATIONS.md) covers migrations, errors, queues, recovery and architectural tradeoffs. Authentication is intentionally omitted for the challenge; the no-op guard is the extension point for an external OIDC identity provider and provider authorization. Health stays public.
+- Logs: `docker compose logs -f app app2 app3`
+- Processo ativo: `GET /health/live`
+- Prontidão das dependências: `GET /health/ready`
+- Métricas: `GET /metrics`
 
-## Original challenge
+Para conectar pelo DBeaver, as credenciais do exemplo são:
 
-The supplied specification is preserved verbatim below. Its requirements remain authoritative.
+- Host: `localhost`
+- Porta: `5432`
+- Banco: `wagering`
+- Schema: `wagering`
+- Usuário: `wager_app`
+- Senha: `local-app`
+
+O usuário da aplicação não pode atualizar ou excluir o histórico do ledger. As migrations usam um usuário separado.
+
+## Arquitetura e comportamento
+
+O [ARCHITECTURE.md](ARCHITECTURE.md) explica as escolhas e seus custos.
+
+A autenticação não foi implementada. Há um guard que permite as requisições como ponto de extensão; a aplicação não autentica provedores nem usuários.
+
+## Enunciado original
+
+O enunciado original está preservado abaixo, sem alterações.
 
 <details>
 <summary>Technical challenge (Portuguese)</summary>
