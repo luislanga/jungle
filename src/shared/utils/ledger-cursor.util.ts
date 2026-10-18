@@ -3,12 +3,13 @@ import { z } from 'zod';
 import { ApplicationError } from '@/shared/errors/application.error';
 import { APPLICATION_ERRORS } from '@/shared/errors/errors.constant';
 import type { LedgerCursor } from '@/shared/interfaces/wallet.interface';
+import { UUID_SCHEMA } from '@/shared/contracts/identifier.schema';
 
 const LEDGER_CURSOR_SCHEMA = z.strictObject({
   version: z.literal(LEDGER_CURSOR_VERSION),
-  walletId: z.uuid(),
+  walletId: UUID_SCHEMA,
   createdAt: z.iso.datetime(),
-  id: z.uuid(),
+  id: UUID_SCHEMA,
 });
 
 export function encodeLedgerCursor(cursor: LedgerCursor): string {
@@ -20,7 +21,8 @@ export function decodeLedgerCursor(value: string, walletId: string): LedgerCurso
     const decoded = Buffer.from(value, 'base64url');
     if (decoded.toString('base64url') !== value) throw new Error('Noncanonical cursor encoding');
     const cursor = LEDGER_CURSOR_SCHEMA.parse(JSON.parse(decoded.toString('utf8')) as unknown);
-    if (cursor.walletId !== walletId) throw new Error('Cursor belongs to a different wallet');
+    if (cursor.walletId !== UUID_SCHEMA.parse(walletId))
+      throw new Error('Cursor belongs to a different wallet');
     return cursor;
   } catch {
     throw new ApplicationError(APPLICATION_ERRORS.INVALID_LEDGER_CURSOR);

@@ -19,6 +19,8 @@ import type {
   WagerCommand,
   WagerProcessingResult,
 } from '@/shared/interfaces/wager-command.interface';
+import { MAX_IDENTIFIER_LENGTH } from '@/shared/consts/identifier.constant';
+import { WalletRepository } from '@/modules/wallet/infrastructure/persistence/repositories/wallet.repository';
 
 let db: Awaited<ReturnType<typeof startPostgresTest>>,
   http: Awaited<ReturnType<typeof startHttpTest>>;
@@ -44,6 +46,102 @@ async function submit(command: WagerCommand) {
   const result = (await response.json()) as WagerProcessingResult;
   return { response, result };
 }
+
+test('uppercase UUIDs from wallet opening support wagering, replay and ledger pagination', async () => {
+  const playerId = crypto.randomUUID();
+  const opened = await http.request(
+    '/wallets',
+    jsonRequest({
+      playerId: playerId.toUpperCase(),
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    }),
+  );
+  expect(opened.status).toBe(201);
+  const wallet = (await opened.json()) as { id: string; playerId: string };
+  expect(wallet.playerId).toBe(playerId);
+  const persistedWallet = await new WalletRepository(db.app.manager).findById(wallet.id);
+  const command = wagerCommand(persistedWallet!);
+  const first = await submit({
+    ...command,
+    data: {
+      ...command.data,
+      playerId: playerId.toUpperCase(),
+      walletId: wallet.id.toUpperCase(),
+    },
+  });
+  expect(first.response.status).toBe(200);
+  expect((await submit(command)).result).toEqual({ ...first.result, idempotentReplay: true });
+  const page = await http.request(`/wallets/${wallet.id}/ledger?limit=1`);
+  const { nextCursor } = (await page.json()) as { nextCursor: string };
+  const next = await http.request(
+    `/wallets/${wallet.id.toUpperCase()}/ledger?limit=1&cursor=${nextCursor}`,
+  );
+  expect(next.status).toBe(200);
+  const nextPage = (await next.json()) as { items: unknown[]; nextCursor: string | null };
+  expect(nextPage.items).toHaveLength(1);
+  expect(nextPage.nextCursor).toBeNull();
+  await assertWalletLedger(db.app, wallet.id, '75.00');
+});
+
+test('oversized identifiers return 400 without persisting financial work', async () => {
+  const wallet = await openTestWallet(db.app);
+  const command = wagerCommand(wallet);
+  const oversized = 'x'.repeat(MAX_IDENTIFIER_LENGTH + 1);
+  const IDENTIFIER_FIELDS = [
+    'providerId',
+    'externalTransactionId',
+    'roundId',
+    'gameId',
+    'referenceExternalTransactionId',
+  ] as const;
+  for (const field of IDENTIFIER_FIELDS) {
+    expect(
+      (await submit({ ...command, data: { ...command.data, [field]: oversized } })).response.status,
+    ).toBe(400);
+  }
+  expect((await submit({ ...command, idempotencyKey: oversized })).response.status).toBe(400);
+  expect((await http.request(`/providers/${oversized}/wagering/transactions/unknown`)).status).toBe(
+    400,
+  );
+  expect((await http.request(`/providers/unknown/wagering/transactions/${oversized}`)).status).toBe(
+    400,
+  );
+  const [audit] = await db.app.query<
+    Array<{
+      wagers: number;
+      entries: number;
+      events: number;
+      version: number;
+    }>
+  >(
+    `SELECT w.version,
+      (SELECT count(*)::int FROM wagering.wager_transactions WHERE wallet_id=w.id) AS wagers,
+      (SELECT count(*)::int FROM wagering.wallet_ledger_entries WHERE wallet_id=w.id) AS entries,
+      (SELECT count(*)::int FROM wagering.outbox_messages WHERE aggregate_id=w.id) AS events
+     FROM wagering.wallets w WHERE w.id=$1`,
+    [wallet.id],
+  );
+  expect(audit).toEqual({
+    wagers: 1,
+    entries: 1,
+    events: 2,
+    version: 1,
+  });
+  await assertWalletLedger(db.app, wallet.id, '100.00');
+});
+
+test('maximum-length multibyte provider and external IDs fit the real PostgreSQL index', async () => {
+  const wallet = await openTestWallet(db.app);
+  const maximum = '界'.repeat(MAX_IDENTIFIER_LENGTH);
+  const command = wagerCommand(wallet, {
+    providerId: maximum,
+    externalTransactionId: maximum,
+  });
+  command.idempotencyKey = 'k'.repeat(MAX_IDENTIFIER_LENGTH);
+  expect((await submit(command)).response.status).toBe(200);
+  expect((await submit(command)).result.idempotentReplay).toBe(true);
+  await assertWalletLedger(db.app, wallet.id, '75.00');
+});
 
 test('HTTP processes all kinds, both WIN payloads and returns the original balance on replay', async () => {
   const wallet = await openTestWallet(db.app);

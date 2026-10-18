@@ -5,6 +5,7 @@ import {
   parseSqsWager,
 } from '@/modules/wagering/application/contracts/wager-command.contract';
 import { WagerTransactionKind as Kind } from '@/shared/enums/wager.enum';
+import { MAX_IDENTIFIER_LENGTH } from '@/shared/consts/identifier.constant';
 
 const payload = () => ({
   providerId: 'provider',
@@ -140,4 +141,45 @@ test('equivalent decimal strings keep the same normalized command and persistent
     expect(parseSqsWager(envelope(body)).command.data).toEqual(expected.data);
     expect(parseSqsWager(envelope(body)).command.payloadHash).toBe(expected.payloadHash);
   }
+});
+
+test('UUID casing does not change commands or hashes across HTTP and SQS', () => {
+  const expected = parseHttpWager(payload(), 'key');
+  const uppercase = {
+    ...payload(),
+    playerId: payload().playerId.toUpperCase(),
+    walletId: payload().walletId.toUpperCase(),
+  };
+  expect(parseHttpWager(uppercase, 'key')).toEqual(expected);
+  expect(parseSqsWager(envelope(uppercase)).command.data).toEqual(expected.data);
+  expect(parseSqsWager(envelope(uppercase)).command.payloadHash).toBe(expected.payloadHash);
+});
+
+test('both transports enforce identifier limits, including keys and envelope IDs', () => {
+  const maximum = '界'.repeat(MAX_IDENTIFIER_LENGTH);
+  const oversized = maximum + '界';
+  const IDENTIFIER_FIELDS = [
+    'providerId',
+    'externalTransactionId',
+    'roundId',
+    'gameId',
+    'referenceExternalTransactionId',
+  ] as const;
+  for (const field of IDENTIFIER_FIELDS) {
+    const valid = { ...payload(), [field]: maximum };
+    expect(parseHttpWager(valid, 'key').data[field]).toBe(maximum);
+    expect(parseSqsWager(envelope(valid)).command.data[field]).toBe(maximum);
+    expect(() => parseHttpWager({ ...payload(), [field]: oversized }, 'key')).toThrow();
+    expect(() => parseSqsWager(envelope({ ...payload(), [field]: oversized }))).toThrow();
+  }
+  expect(parseHttpWager(payload(), maximum).idempotencyKey).toBe(maximum);
+  expect(() => parseHttpWager(payload(), oversized)).toThrow();
+  expect(() =>
+    parseSqsWager({
+      ...envelope(payload()),
+      data: { ...payload(), idempotencyKey: oversized },
+    }),
+  ).toThrow();
+  expect(parseSqsWager({ ...envelope(payload()), messageId: maximum }).messageId).toBe(maximum);
+  expect(() => parseSqsWager({ ...envelope(payload()), messageId: oversized })).toThrow();
 });

@@ -11,6 +11,7 @@ import {
 import { SqsWagerConsumer } from '@/modules/messaging/application/sqs-wager.consumer';
 import { WAGER_CONSUMER_NAME } from '@/shared/consts/messaging.constant';
 import { WagerTransactionKind } from '@/shared/enums/wager.enum';
+import { canonicalHash } from '@/shared/utils/hash.util';
 
 let http: Awaited<ReturnType<typeof startHttpTest>>;
 let db: Awaited<ReturnType<typeof startMessagingTest>>, consumer: SqsWagerConsumer;
@@ -67,6 +68,77 @@ test('different envelopes and simultaneous HTTP/SQS equivalents still debit once
   ]);
   await enqueueWager(db, command);
   expect((await consumer.pollOnce()).acknowledged).toBe(1);
+  expect((await counts(wallet.id))[0]?.debits).toBe(1);
+  await assertWalletLedger(db.app, wallet.id, '75.00');
+});
+
+test('SQS acknowledges an HTTP replay with different UUID casing without another debit', async () => {
+  const wallet = await openTestWallet(db.app);
+  const command = wagerCommand(wallet);
+  const response = await http.request('/wagering/transactions', {
+    ...jsonRequest(command.data),
+    headers: { 'content-type': 'application/json', 'idempotency-key': command.idempotencyKey },
+  });
+  expect(response.status).toBe(200);
+  const messageId = crypto.randomUUID();
+  await enqueueWager(
+    db,
+    {
+      ...command,
+      data: {
+        ...command.data,
+        playerId: wallet.playerId.toUpperCase(),
+        walletId: wallet.id.toUpperCase(),
+      },
+    },
+    messageId,
+  );
+  expect((await consumer.pollOnce()).acknowledged).toBe(1);
+  expect((await counts(wallet.id))[0]?.debits).toBe(1);
+  const [inbox] = await db.app.query<Array<{ processed: boolean }>>(
+    'SELECT processed_at IS NOT NULL AS processed FROM wagering.inbox_messages WHERE message_id=$1',
+    [messageId],
+  );
+  expect(inbox?.processed).toBe(true);
+  await assertWalletLedger(db.app, wallet.id, '75.00');
+});
+
+test('legacy UUID hashes replay across HTTP and the original Inbox without rewriting history', async () => {
+  const wallet = await openTestWallet(db.app);
+  const command = wagerCommand(wallet);
+  const legacyData = { ...command.data, walletId: wallet.id.toUpperCase() };
+  const legacyHash = canonicalHash(legacyData);
+  const messageId = crypto.randomUUID();
+  const original = await financialServices(db.app).process.execute(
+    { ...command, data: legacyData, payloadHash: legacyHash },
+    {
+      correlationId: 'legacy-uuid',
+      inbox: { consumerName: WAGER_CONSUMER_NAME, messageId },
+    },
+  );
+  const replay = await http.request('/wagering/transactions', {
+    ...jsonRequest(command.data),
+    headers: { 'content-type': 'application/json', 'idempotency-key': command.idempotencyKey },
+  });
+  expect(replay.status).toBe(200);
+  expect(await replay.json()).toEqual({ ...original, idempotentReplay: true });
+  await enqueueWager(db, command, messageId);
+  expect((await consumer.pollOnce()).acknowledged).toBe(1);
+  const conflict = await http.request('/wagering/transactions', {
+    ...jsonRequest({ ...command.data, gameId: 'different-game' }),
+    headers: { 'content-type': 'application/json', 'idempotency-key': command.idempotencyKey },
+  });
+  expect(conflict.status).toBe(409);
+  const [stored] = await db.app.query<Array<{ payload_hash: string }>>(
+    'SELECT payload_hash FROM wagering.wager_transactions WHERE id=$1',
+    [original.transactionId],
+  );
+  const [inbox] = await db.app.query<Array<{ payload_hash: string }>>(
+    'SELECT payload_hash FROM wagering.inbox_messages WHERE consumer_name=$1 AND message_id=$2',
+    [WAGER_CONSUMER_NAME, messageId],
+  );
+  expect(stored?.payload_hash).toBe(legacyHash);
+  expect(inbox?.payload_hash).toBe(legacyHash);
   expect((await counts(wallet.id))[0]?.debits).toBe(1);
   await assertWalletLedger(db.app, wallet.id, '75.00');
 });

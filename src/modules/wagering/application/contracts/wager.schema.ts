@@ -6,20 +6,21 @@ import {
   isSelfReference,
 } from '@/shared/utils/wager.util';
 import { MONEY_INPUT_SCHEMA } from '@/shared/contracts/money.schema';
+import { IDENTIFIER_SCHEMA, UUID_SCHEMA } from '@/shared/contracts/identifier.schema';
 
-export const IDEMPOTENCY_KEY_SCHEMA = z.string().min(1);
+export const IDEMPOTENCY_KEY_SCHEMA = IDENTIFIER_SCHEMA;
 export const WAGER_BUSINESS_SCHEMA = z
   .strictObject({
-    providerId: z.string().min(1),
-    externalTransactionId: z.string().min(1),
-    playerId: z.uuid(),
-    walletId: z.uuid(),
-    roundId: z.string().min(1),
-    gameId: z.string().min(1),
+    providerId: IDENTIFIER_SCHEMA,
+    externalTransactionId: IDENTIFIER_SCHEMA,
+    playerId: UUID_SCHEMA,
+    walletId: UUID_SCHEMA,
+    roundId: IDENTIFIER_SCHEMA,
+    gameId: IDENTIFIER_SCHEMA,
     kind: z.enum([Kind.Bet, Kind.Win, Kind.Loss, Kind.Refund, Kind.Rollback]),
     money: MONEY_INPUT_SCHEMA,
     // README 7 allows WIN payloads both with and without a BET reference (optional referenceExternalTransactionId).
-    referenceExternalTransactionId: z.string().min(1).optional(),
+    referenceExternalTransactionId: IDENTIFIER_SCHEMA.optional(),
   })
   .refine((data) => !requiresWagerReference(data.kind) || !!data.referenceExternalTransactionId, {
     path: ['referenceExternalTransactionId'],
@@ -39,7 +40,7 @@ export const WAGER_BUSINESS_SCHEMA = z
   });
 
 export const WAGER_ENVELOPE_SCHEMA = z.strictObject({
-  messageId: z.string().min(1),
+  messageId: IDENTIFIER_SCHEMA,
   type: z.literal('WagerTransactionRequested'),
   occurredAt: z.iso.datetime({ offset: true }),
   data: WAGER_BUSINESS_SCHEMA.safeExtend({ idempotencyKey: IDEMPOTENCY_KEY_SCHEMA }),

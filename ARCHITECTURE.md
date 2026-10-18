@@ -99,7 +99,7 @@ A Inbox deduplica mensagens pelo consumidor e pelo `messageId` do envelope. Isso
 
 #### Como o hash é calculado
 
-HTTP e SQS validam os dados e normalizam o valor monetário para duas casas antes de calcular o hash. A função `canonicalHash`, em `src/shared/utils/hash.util.ts`, ordena recursivamente as chaves dos objetos, mantém a ordem dos arrays e serializa com `JSON.stringify`. Sobre esse JSON em UTF-8, calcula SHA-256 e salva o resultado hexadecimal.
+HTTP e SQS validam os dados, normalizam UUIDs para minúsculas e o valor monetário para duas casas antes de calcular o hash. A função `canonicalHash`, em `src/shared/utils/hash.util.ts`, ordena recursivamente as chaves dos objetos, mantém a ordem dos arrays e serializa com `JSON.stringify`. Sobre esse JSON em UTF-8, calcula SHA-256 e salva o resultado hexadecimal.
 
 Entram no hash:
 

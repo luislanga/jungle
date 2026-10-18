@@ -124,6 +124,7 @@ O saldo deve ficar em `75.00`. Reenviar a mesma requisição com a mesma chave d
 Alguns detalhes:
 
 - Valores monetários são strings decimais, não números.
+- UUIDs são normalizados para minúsculas. Identificadores textuais, chaves de idempotência e IDs de mensagens aceitam até 255 caracteres.
 - Esta configuração aceita BRL.
 - Novas operações precisam de novas chaves de idempotência e IDs externos de transação.
 - Criar outra carteira para o mesmo jogador e moeda retorna conflito. Use outro ID de jogador se quiser repetir o exemplo do início.
@@ -210,6 +211,18 @@ O usuário da aplicação não pode atualizar ou excluir o histórico do ledger.
 O [ARCHITECTURE.md](ARCHITECTURE.md) explica as escolhas e seus custos.
 
 A autenticação não foi implementada. Há um guard que permite as requisições como ponto de extensão; a aplicação não autentica provedores nem usuários.
+
+## Próximos passos
+
+Priorizei os requisitos obrigatórios dentro do prazo do desafio. Ficaram como possíveis evoluções:
+
+- Integrar o dashboard à entrega, com instruções para execução.
+- Adicionar tracing com OpenTelemetry.
+- Criar um `test:load` e registrar throughput, p50/p95/p99, erros e contenção de locks.
+- Evoluir o ledger para partidas dobradas.
+- Integrar autenticação com um provedor de identidade externo, conforme o desenho no ARCHITECTURE.md.
+
+Além dos opcionais, melhoraria a persistência das filas do LocalStack para sobreviver à recriação do container e o contexto dos logs de falha dos workers.
 
 ## Enunciado original
 

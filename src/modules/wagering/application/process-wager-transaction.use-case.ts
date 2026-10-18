@@ -31,6 +31,7 @@ import { Money } from '@/shared/domain/money.domain';
 import {
   businessFailureCode,
   nextReferenceAttempt,
+  matchesWagerPayload,
 } from '@/modules/wagering/application/transaction.policy';
 import type { StoredWager } from '@/shared/interfaces/wager-persistence.interface';
 import type {
@@ -82,11 +83,14 @@ export class ProcessWagerTransactionUseCase {
           if (!stored) throw new ApplicationError(APPLICATION_ERRORS.EXTERNAL_TRANSACTION_CONFLICT);
           created = stored.transaction.id === transaction.id;
         }
-        if (!stored.transaction.matchesPayload(command.payloadHash))
+        if (!matchesWagerPayload(stored.transaction, command))
           throw new ApplicationError(APPLICATION_ERRORS.IDEMPOTENCY_CONFLICT);
         const inbox = context.inbox
           ? await repositories.inbox.receive(
-              InboxMessage.receive({ ...context.inbox, payloadHash: command.payloadHash }),
+              InboxMessage.receive({
+                ...context.inbox,
+                payloadHash: stored.transaction.payloadHash,
+              }),
             )
           : undefined;
         const result = created
