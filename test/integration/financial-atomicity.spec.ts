@@ -1,5 +1,7 @@
+import { OUTCOME_COUNT, PROCESSING_DURATION } from '@/shared/infrastructure/metrics/metrics';
+import { readOutboxConfig } from '@/config/outbox';
 import { createOutboxStore } from '@/modules/messaging/infrastructure/persistence/worker-store.factory';
-import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
 import { startMessagingTest } from '@test/support/messaging.util';
 import {
   assertWalletLedger,
@@ -61,6 +63,7 @@ for (const [table, operation, condition, deferred] of FAULTS) {
     const publisher = new OutboxPublisher(
       createOutboxStore(db.app, financialServices(db.app).config),
       db.sqs,
+      readOutboxConfig(),
     );
     // Publish the opening first so any later claim would belong to the failed wager.
     await publisher.runOnce();
@@ -139,3 +142,57 @@ test('runtime role cannot bypass financial defenses on a wallet created through 
   expect(await snapshot(wallet.id)).toEqual(before);
   await assertWalletLedger(db.app, wallet.id, '75.00');
 });
+
+test.each(['timer start', 'timer stop', 'outcome counter'])(
+  '%s failure cannot fail committed wallet or wager operations',
+  async (fault) => {
+    const metric =
+      fault === 'outcome counter'
+        ? spyOn(OUTCOME_COUNT, 'inc').mockImplementation(() => {
+            throw new Error('Metrics unavailable');
+          })
+        : spyOn(PROCESSING_DURATION, 'startTimer').mockImplementation(() => {
+            if (fault === 'timer start') throw new Error('Metrics unavailable');
+            return () => {
+              throw new Error('Metrics unavailable');
+            };
+          });
+    try {
+      const wallet = await openTestWallet(db.app);
+      const command = wagerCommand(wallet);
+      const context = {
+        ...TEST_CONTEXT,
+        inbox: { consumerName: 'metrics-failure-test', messageId: crypto.randomUUID() },
+      };
+      const service = financialServices(db.app).process;
+      const original = await service.execute(command, context);
+      expect(original).toMatchObject({
+        status: 'PROCESSED',
+        balance: { amount: '75.00', currency: 'BRL' },
+        idempotentReplay: false,
+      });
+      expect(await service.execute(command, context)).toEqual({
+        ...original,
+        idempotentReplay: true,
+      });
+      expect(await snapshot(wallet.id)).toEqual([
+        {
+          balance: '75.00',
+          version: 2,
+          wagers: 2,
+          ledger: 2,
+          events: 4,
+        },
+      ]);
+      expect(
+        await db.app.query(
+          'SELECT message_id FROM wagering.inbox_messages WHERE message_id=$1 AND processed_at IS NOT NULL',
+          [context.inbox.messageId],
+        ),
+      ).toHaveLength(1);
+      await assertWalletLedger(db.app, wallet.id, '75.00');
+    } finally {
+      metric.mockRestore();
+    }
+  },
+);

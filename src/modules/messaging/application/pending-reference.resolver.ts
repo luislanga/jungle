@@ -1,9 +1,6 @@
 import type { PendingWorkStore } from '@/shared/interfaces/worker-store.interface';
 import { RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
-import {
-  readPendingReferenceConfig,
-  type PendingReferenceConfig,
-} from '@/config/pending-reference';
+import type { PendingReferenceConfig } from '@/config/pending-reference';
 import type { ProcessWagerTransactionUseCase } from '@/modules/wagering/application/process-wager-transaction.use-case';
 import { WagerTransactionStatus } from '@/shared/enums/wager.enum';
 
@@ -13,7 +10,7 @@ export class PendingReferenceResolver {
   constructor(
     private readonly store: PendingWorkStore,
     private readonly processWager: ProcessWagerTransactionUseCase,
-    private readonly config: PendingReferenceConfig = readPendingReferenceConfig(),
+    private readonly config: PendingReferenceConfig,
   ) {}
 
   async runOnce() {

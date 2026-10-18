@@ -19,18 +19,14 @@ export class WorkerRuntime {
   ) {}
 
   start(): void {
-    if (!this.settings.worker.WORKERS_ENABLED || this.running.length) return;
+    if (!this.settings.enabled || this.running.length) return;
     this.running = [
       this.loop('sqs', () => this.consumer.pollOnce(this.stopPolling.signal), 0),
-      this.loop(
-        'outbox',
-        () => this.publisher.runOnce(),
-        this.settings.outbox.OUTBOX_POLL_INTERVAL_MS,
-      ),
+      this.loop('outbox', () => this.publisher.runOnce(), this.settings.outboxPollIntervalMs),
       this.loop(
         'pending-reference',
         () => this.resolver.runOnce(),
-        this.settings.pending.PENDING_REFERENCE_POLL_INTERVAL_MS,
+        this.settings.pendingPollIntervalMs,
       ),
     ];
   }
@@ -50,15 +46,12 @@ export class WorkerRuntime {
       process.stderr.write(
         JSON.stringify({ level: 'error', event: 'worker_shutdown_deadline' }) + '\n',
       );
-      const force = setTimeout(
-        () => process.exit(1),
-        this.settings.messaging.SQS_REQUEST_TIMEOUT_MS,
-      );
+      const force = setTimeout(() => process.exit(1), this.settings.sqsRequestTimeoutMs);
       void this.consumer.releaseInFlight().finally(() => {
         clearTimeout(force);
         process.exit(1);
       });
-    }, this.settings.worker.SHUTDOWN_DRAIN_MS);
+    }, this.settings.shutdownDrainMs);
     try {
       await Promise.allSettled(this.running);
     } finally {

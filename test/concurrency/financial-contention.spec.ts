@@ -1,3 +1,4 @@
+import { readPendingReferenceConfig } from '@/config/pending-reference';
 import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { startPostgresTest } from '@test/support/postgres.util';
@@ -133,7 +134,10 @@ test('lock timeouts retry fresh transactions a bounded number of times without p
   }
   expect(attempts).toHaveLength(3);
   expect(new Set(attempts).size).toBe(3);
-  const service = new ProcessWagerTransactionUseCase(createFinancialTransaction(db.app, config));
+  const service = new ProcessWagerTransactionUseCase(
+    createFinancialTransaction(db.app, config),
+    readPendingReferenceConfig(),
+  );
   expect((await service.execute(wagerCommand(wallet), TEST_CONTEXT)).balance.amount).toBe('75.00');
   await assertWalletLedger(db.app, wallet.id, '75.00');
 });
@@ -199,6 +203,7 @@ test('lost response after commit is resolved by durable replay through a new con
   await disconnected.initialize();
   const original = await new ProcessWagerTransactionUseCase(
     createFinancialTransaction(disconnected, config),
+    readPendingReferenceConfig(),
   ).execute(command, TEST_CONTEXT);
   await disconnected.destroy();
   expect(await financialServices(db.app).process.execute(command, TEST_CONTEXT)).toEqual({

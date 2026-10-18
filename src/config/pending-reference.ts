@@ -1,3 +1,4 @@
+import { readConfig } from '@/config/config.util';
 import { z } from 'zod';
 
 // These are configurable demo limits. Production values need a provider/SLA review:
@@ -19,8 +20,8 @@ const PENDING_REFERENCE_CONFIG_SCHEMA = z
   );
 
 export function readPendingReferenceConfig(env: NodeJS.ProcessEnv = process.env) {
-  const parsed = PENDING_REFERENCE_CONFIG_SCHEMA.safeParse(env);
-  if (!parsed.success) throw new Error('Invalid pending-reference configuration');
-  return parsed.data;
+  return readConfig(PENDING_REFERENCE_CONFIG_SCHEMA, 'pending-reference', env);
 }
 export type PendingReferenceConfig = z.infer<typeof PENDING_REFERENCE_CONFIG_SCHEMA>;
+
+export const PENDING_REFERENCE_CONFIG = Symbol('PENDING_REFERENCE_CONFIG');

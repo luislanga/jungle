@@ -1,5 +1,6 @@
+import { postgresCause } from '@/database/postgres-error.util';
 import { LOCK_CONFLICT_COUNT, RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
-import { DataSource, type EntityManager, QueryFailedError } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import type { DatabaseConfig } from '@/config/database';
 import { isRetryablePostgresError } from '@/shared/utils/postgres.util';
 
@@ -27,7 +28,7 @@ export async function withTransaction<Result>(
         return work(manager);
       });
     } catch (error) {
-      const cause: unknown = error instanceof QueryFailedError ? error.driverError : error;
+      const cause = postgresCause(error);
       const retryable = isRetryablePostgresError(cause);
       if (
         retryable &&

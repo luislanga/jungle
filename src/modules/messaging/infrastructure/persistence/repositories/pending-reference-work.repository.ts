@@ -57,26 +57,22 @@ export class PendingReferenceWorkRepository {
 
   async complete(transactionId: string, token: string): Promise<boolean> {
     requireTransaction(this.manager);
-    const rows = await this.manager.query<Array<{ transaction_id: string }>>(
-      `WITH completed AS (
-      DELETE FROM wagering.pending_reference_work WHERE transaction_id=$1 AND claim_token=$2
-        AND claim_until>clock_timestamp() RETURNING transaction_id
-    ) SELECT * FROM completed`,
+    const [, affected] = await this.manager.query<[unknown[], number]>(
+      `DELETE FROM wagering.pending_reference_work WHERE transaction_id=$1 AND claim_token=$2
+        AND claim_until>clock_timestamp() RETURNING transaction_id`,
       [transactionId, token],
     );
-    return rows.length === 1;
+    return affected === 1;
   }
 
   async scheduleRetry(transactionId: string, token: string, nextAttemptAt: Date): Promise<boolean> {
     requireTransaction(this.manager);
-    const rows = await this.manager.query<Array<{ transaction_id: string }>>(
-      `WITH retried AS (
-      UPDATE wagering.pending_reference_work SET attempts=attempts+1,next_attempt_at=$3,
+    const [, affected] = await this.manager.query<[unknown[], number]>(
+      `UPDATE wagering.pending_reference_work SET attempts=attempts+1,next_attempt_at=$3,
         claim_owner=NULL,claim_token=NULL,claim_until=NULL
-      WHERE transaction_id=$1 AND claim_token=$2 AND claim_until>clock_timestamp() RETURNING transaction_id
-    ) SELECT * FROM retried`,
+      WHERE transaction_id=$1 AND claim_token=$2 AND claim_until>clock_timestamp() RETURNING transaction_id`,
       [transactionId, token, nextAttemptAt],
     );
-    return rows.length === 1;
+    return affected === 1;
   }
 }

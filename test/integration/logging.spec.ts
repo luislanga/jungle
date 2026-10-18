@@ -1,3 +1,5 @@
+import { readOutboxConfig } from '@/config/outbox';
+import { readPendingReferenceConfig } from '@/config/pending-reference';
 import {
   createPendingWorkStore,
   createOutboxStore,
@@ -82,10 +84,12 @@ test('JSON logs trace HTTP/SQS/replay/resume/publish outcomes without bodies, am
     await new PendingReferenceResolver(
       createPendingWorkStore(db.app, financialServices(db.app).config),
       financialServices(db.app).process,
+      readPendingReferenceConfig(),
     ).runOnce();
     await new OutboxPublisher(
       createOutboxStore(db.app, financialServices(db.app).config),
       db.sqs,
+      readOutboxConfig(),
     ).runOnce();
     writeLog('redaction_probe', {
       correlationId: 'trace-log-test',

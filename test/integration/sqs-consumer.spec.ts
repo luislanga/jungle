@@ -1,3 +1,4 @@
+import { readMessagingConfig } from '@/config/messaging';
 import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
 import { startHttpTest, jsonRequest } from '@test/support/http.util';
 import { startMessagingTest, enqueueWager } from '@test/support/messaging.util';
@@ -16,7 +17,7 @@ let db: Awaited<ReturnType<typeof startMessagingTest>>, consumer: SqsWagerConsum
 beforeAll(async () => {
   db = await startMessagingTest();
   http = await startHttpTest(db.app);
-  consumer = new SqsWagerConsumer(db.sqs, financialServices(db.app).process);
+  consumer = new SqsWagerConsumer(db.sqs, financialServices(db.app).process, readMessagingConfig());
 }, 180_000);
 afterAll(async () => {
   await http?.app.close();

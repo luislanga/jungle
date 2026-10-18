@@ -1,3 +1,4 @@
+import { WagerTransactionStatus } from '@/shared/enums/wager.enum';
 import {
   INTERNAL_PROVIDER_ID,
   INTERNAL_GAME_ID,
@@ -6,7 +7,11 @@ import {
 } from '@/shared/consts/wager.constant';
 import { isAllowedCurrency } from '@/shared/utils/money.util';
 import type { FinancialTransaction } from '@/shared/interfaces/financial-transaction.interface';
-import { PROCESSING_DURATION, OUTCOME_COUNT } from '@/shared/infrastructure/metrics/metrics';
+import {
+  startProcessingTimer,
+  recordMetrics,
+  OUTCOME_COUNT,
+} from '@/shared/infrastructure/metrics/metrics';
 import { writeLog } from '@/shared/infrastructure/logging/application.logger';
 import { Wallet } from '@/modules/wallet/domain/wallet.domain';
 import { WalletLedgerEntry } from '@/modules/wallet/domain/wallet-ledger-entry.domain';
@@ -30,7 +35,7 @@ export class OpenWalletUseCase {
   async execute(input: OpenWalletInput, context: EventContext): Promise<Wallet> {
     if (!isAllowedCurrency(input.initialBalance.currency))
       throw new DomainError(DOMAIN_ERRORS.UNSUPPORTED_CURRENCY);
-    const observe = PROCESSING_DURATION.startTimer({ operation: 'open_wallet' });
+    const stopTimer = startProcessingTimer('open_wallet');
     try {
       // PostgreSQL commits the wallet, opening entry and events together. No SQS send happens here.
       // A CHECK cannot ensure balance equals the ledger total; all repositories must share the same transaction.
@@ -92,11 +97,12 @@ export class OpenWalletUseCase {
         );
         return wallet;
       });
-      if (wallet.balance.isPositive()) OUTCOME_COUNT.inc({ status: 'PROCESSED' });
+      if (wallet.balance.isPositive())
+        recordMetrics(() => OUTCOME_COUNT.inc({ status: WagerTransactionStatus.Processed }));
       writeLog('wallet_opened', { correlationId: context.correlationId, walletId: wallet.id });
       return wallet;
     } finally {
-      observe();
+      stopTimer();
     }
   }
 }

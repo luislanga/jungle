@@ -1,5 +1,4 @@
 import { ReconcileWalletUseCase } from '@/modules/wallet/application/reconcile-wallet.use-case';
-import { ReconciliationSignals } from '@/modules/wallet/infrastructure/observability/reconciliation-signals.service';
 import { ListLedgerUseCase } from '@/modules/wallet/application/list-ledger.use-case';
 import { GetWalletUseCase } from '@/modules/wallet/application/get-wallet.use-case';
 import { WalletQueriesAdapter } from '@/modules/wallet/infrastructure/persistence/wallet-queries.adapter';
@@ -12,24 +11,25 @@ import { ChallengeAuthGuard } from '@/shared/presentation/challenge-auth.guard';
 
 export const WALLET_PROVIDERS: Provider[] = [
   ChallengeAuthGuard,
-  ReconciliationSignals,
+  {
+    provide: WalletQueriesAdapter,
+    inject: [DataSource],
+    useFactory: (dataSource: DataSource) => new WalletQueriesAdapter(dataSource),
+  },
   {
     provide: ReconcileWalletUseCase,
-    inject: [DataSource, ReconciliationSignals],
-    useFactory: (dataSource: DataSource, signals: ReconciliationSignals) =>
-      new ReconcileWalletUseCase(new WalletQueriesAdapter(dataSource), signals),
+    inject: [WalletQueriesAdapter],
+    useFactory: (queries: WalletQueriesAdapter) => new ReconcileWalletUseCase(queries),
   },
   {
     provide: ListLedgerUseCase,
-    inject: [DataSource],
-    useFactory: (dataSource: DataSource) =>
-      new ListLedgerUseCase(new WalletQueriesAdapter(dataSource)),
+    inject: [WalletQueriesAdapter],
+    useFactory: (queries: WalletQueriesAdapter) => new ListLedgerUseCase(queries),
   },
   {
     provide: GetWalletUseCase,
-    inject: [DataSource],
-    useFactory: (dataSource: DataSource) =>
-      new GetWalletUseCase(new WalletQueriesAdapter(dataSource)),
+    inject: [WalletQueriesAdapter],
+    useFactory: (queries: WalletQueriesAdapter) => new GetWalletUseCase(queries),
   },
   {
     provide: OpenWalletUseCase,

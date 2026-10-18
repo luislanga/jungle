@@ -1,3 +1,8 @@
+import {
+  PENDING_REFERENCE_CONFIG,
+  readPendingReferenceConfig,
+  type PendingReferenceConfig,
+} from '@/config/pending-reference';
 import type { Provider } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { FINANCIAL_TRANSACTION } from '@/database/database.module';
@@ -9,6 +14,7 @@ import { ChallengeAuthGuard } from '@/shared/presentation/challenge-auth.guard';
 
 export const WAGERING_PROVIDERS: Provider[] = [
   ChallengeAuthGuard,
+  { provide: PENDING_REFERENCE_CONFIG, useFactory: () => readPendingReferenceConfig() },
   {
     provide: GetWagerTransactionUseCase,
     inject: [DataSource],
@@ -17,8 +23,8 @@ export const WAGERING_PROVIDERS: Provider[] = [
   },
   {
     provide: ProcessWagerTransactionUseCase,
-    inject: [FINANCIAL_TRANSACTION],
-    useFactory: (transaction: FinancialTransaction) =>
-      new ProcessWagerTransactionUseCase(transaction),
+    inject: [FINANCIAL_TRANSACTION, PENDING_REFERENCE_CONFIG],
+    useFactory: (transaction: FinancialTransaction, config: PendingReferenceConfig) =>
+      new ProcessWagerTransactionUseCase(transaction, config),
   },
 ];

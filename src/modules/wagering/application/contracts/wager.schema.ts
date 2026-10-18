@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { WagerTransactionKind as Kind } from '@/shared/enums/wager.enum';
+import {
+  requiresWagerReference,
+  allowsZeroWagerAmount,
+  isSelfReference,
+} from '@/shared/utils/wager.util';
 import { MONEY_INPUT_SCHEMA } from '@/shared/contracts/money.schema';
 
 export const IDEMPOTENCY_KEY_SCHEMA = z.string().min(1);
@@ -16,33 +21,21 @@ export const WAGER_BUSINESS_SCHEMA = z
     // README 7 allows WIN payloads both with and without a BET reference (optional referenceExternalTransactionId).
     referenceExternalTransactionId: z.string().min(1).optional(),
   })
-  .superRefine((data, ctx) => {
-    if (
-      (data.kind === Kind.Refund || data.kind === Kind.Rollback) &&
-      !data.referenceExternalTransactionId
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['referenceExternalTransactionId'],
-        message: 'Reference is required for this kind',
-      });
-    }
-    if (data.referenceExternalTransactionId === data.externalTransactionId) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['referenceExternalTransactionId'],
-        message: 'A transaction cannot reference itself',
-      });
-    }
-    // README §6.1 forbids negative input but does not define zero per kind.
-    // Our agreed interpretation accepts zero LOSS and positive money-moving operations.
-    if (data.kind !== Kind.Loss && data.money.amount === '0.00') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['money', 'amount'],
-        message: 'Amount must be positive for this kind',
-      });
-    }
+  .refine((data) => !requiresWagerReference(data.kind) || !!data.referenceExternalTransactionId, {
+    path: ['referenceExternalTransactionId'],
+    message: 'Reference is required for this kind',
+  })
+  .refine(
+    (data) => !isSelfReference(data.externalTransactionId, data.referenceExternalTransactionId),
+    {
+      path: ['referenceExternalTransactionId'],
+      message: 'A transaction cannot reference itself',
+    },
+  )
+  // README leaves zero amounts unspecified: we accept zero LOSS, and require positive money movements.
+  .refine((data) => allowsZeroWagerAmount(data.kind) || data.money.amount !== '0.00', {
+    path: ['money', 'amount'],
+    message: 'Amount must be positive for this kind',
   });
 
 export const WAGER_ENVELOPE_SCHEMA = z.strictObject({

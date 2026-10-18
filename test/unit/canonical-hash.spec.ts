@@ -131,3 +131,13 @@ test('missing keys, unknown fields, internal OPENING, invalid IDs and numeric/ne
   }
   expect(() => parseSqsWager({ ...envelope(payload()), transportField: true })).toThrow();
 });
+
+test('equivalent decimal strings keep the same normalized command and persistent hash', () => {
+  const expected = parseHttpWager(payload(), 'key');
+  for (const amount of ['25', '25.0', '25.00', '00025.00']) {
+    const body = { ...payload(), money: { amount, currency: 'BRL' } };
+    expect(parseHttpWager(body, 'key')).toEqual(expected);
+    expect(parseSqsWager(envelope(body)).command.data).toEqual(expected.data);
+    expect(parseSqsWager(envelope(body)).command.payloadHash).toBe(expected.payloadHash);
+  }
+});

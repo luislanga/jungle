@@ -1,3 +1,4 @@
+import { readConfig } from '@/config/config.util';
 import { z } from 'zod';
 import { isPostgresUrl } from '@/shared/utils/postgres.util';
 
@@ -18,12 +19,7 @@ const DATABASE_CONFIG_SCHEMA = z
   });
 
 export function readDatabaseConfig(env: NodeJS.ProcessEnv = process.env) {
-  const result = DATABASE_CONFIG_SCHEMA.safeParse(env);
-  if (!result.success) {
-    const fields = result.error.issues.map((issue) => issue.path.join('.')).join(', ');
-    throw new Error(`Invalid database configuration: ${fields}`);
-  }
-  return result.data;
+  return readConfig(DATABASE_CONFIG_SCHEMA, 'database', env);
 }
 
 export type DatabaseConfig = z.infer<typeof DATABASE_CONFIG_SCHEMA>;

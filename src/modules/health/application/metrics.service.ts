@@ -1,12 +1,10 @@
 import type { MessageQueue } from '@/shared/interfaces/message-queue.interface';
 import type { OutboxLagReader } from '@/shared/interfaces/health.interface';
-import { ReconciliationSignals } from '@/modules/wallet/infrastructure/observability/reconciliation-signals.service';
 import { DEAD_LETTER_QUEUE_NAME } from '@/shared/consts/messaging.constant';
 import {
   METRICS_REGISTRY,
   DLQ_DEPTH,
   OUTBOX_LAG,
-  RECONCILIATION_COUNT,
   DEPENDENCY_UP,
   COLLECTION_ERRORS,
 } from '@/shared/infrastructure/metrics/metrics';
@@ -16,7 +14,6 @@ export class MetricsService {
   constructor(
     private readonly readOutboxLag: OutboxLagReader,
     private readonly sqs: MessageQueue,
-    private readonly reconciliation: ReconciliationSignals,
   ) {}
 
   async get() {
@@ -33,7 +30,6 @@ export class MetricsService {
         );
       }
     }
-    RECONCILIATION_COUNT.set(this.reconciliation.discrepancyCount);
     return METRICS_REGISTRY.metrics();
   }
 

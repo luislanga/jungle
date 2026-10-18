@@ -9,10 +9,7 @@ import { DATABASE_CONFIG } from '@/database/database.module';
 import type { DatabaseConfig } from '@/config/database';
 import { readMessagingConfig, type MessagingConfig } from '@/config/messaging';
 import { readOutboxConfig, type OutboxConfig } from '@/config/outbox';
-import {
-  readPendingReferenceConfig,
-  type PendingReferenceConfig,
-} from '@/config/pending-reference';
+import { PENDING_REFERENCE_CONFIG, type PendingReferenceConfig } from '@/config/pending-reference';
 import { readWorkerConfig, type WorkerConfig } from '@/config/workers';
 import { ProcessWagerTransactionUseCase } from '@/modules/wagering/application/process-wager-transaction.use-case';
 import { SqsGateway } from '@/modules/messaging/infrastructure/sqs/sqs.gateway';
@@ -23,13 +20,12 @@ import { WorkerRuntime } from '@/modules/messaging/infrastructure/worker.runtime
 
 export const MESSAGING_CONFIG = Symbol('MESSAGING_CONFIG');
 export const OUTBOX_CONFIG = Symbol('OUTBOX_CONFIG');
-export const PENDING_REFERENCE_CONFIG = Symbol('PENDING_REFERENCE_CONFIG');
+export { PENDING_REFERENCE_CONFIG } from '@/config/pending-reference';
 export const WORKER_CONFIG = Symbol('WORKER_CONFIG');
 
 export const MESSAGING_PROVIDERS: Provider[] = [
   { provide: MESSAGING_CONFIG, useFactory: () => readMessagingConfig() },
   { provide: OUTBOX_CONFIG, useFactory: () => readOutboxConfig() },
-  { provide: PENDING_REFERENCE_CONFIG, useFactory: () => readPendingReferenceConfig() },
   { provide: WORKER_CONFIG, useFactory: () => readWorkerConfig() },
   {
     provide: SqsGateway,
@@ -96,10 +92,11 @@ export const MESSAGING_PROVIDERS: Provider[] = [
         publisher,
         resolver,
         {
-          worker,
-          outbox,
-          pending,
-          messaging,
+          enabled: worker.WORKERS_ENABLED,
+          shutdownDrainMs: worker.SHUTDOWN_DRAIN_MS,
+          sqsRequestTimeoutMs: messaging.SQS_REQUEST_TIMEOUT_MS,
+          outboxPollIntervalMs: outbox.OUTBOX_POLL_INTERVAL_MS,
+          pendingPollIntervalMs: pending.PENDING_REFERENCE_POLL_INTERVAL_MS,
         }
       ),
   },

@@ -1,6 +1,6 @@
 import { RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { eventLogContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
-import { readOutboxConfig, type OutboxConfig } from '@/config/outbox';
+import type { OutboxConfig } from '@/config/outbox';
 import type { MessageQueue } from '@/shared/interfaces/message-queue.interface';
 import type { OutboxStore } from '@/shared/interfaces/worker-store.interface';
 import type { ClaimedOutbox } from '@/shared/interfaces/messaging.interface';
@@ -12,7 +12,7 @@ export class OutboxPublisher {
   constructor(
     private readonly store: OutboxStore,
     private readonly sqs: MessageQueue,
-    private readonly config: OutboxConfig = readOutboxConfig(),
+    private readonly config: OutboxConfig,
   ) {}
 
   async runOnce() {

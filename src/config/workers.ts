@@ -1,3 +1,4 @@
+import { readConfig } from '@/config/config.util';
 import { z } from 'zod';
 
 const WORKER_CONFIG_SCHEMA = z.object({
@@ -9,8 +10,6 @@ const WORKER_CONFIG_SCHEMA = z.object({
 });
 
 export function readWorkerConfig(env: NodeJS.ProcessEnv = process.env) {
-  const result = WORKER_CONFIG_SCHEMA.safeParse(env);
-  if (!result.success) throw new Error('Invalid worker configuration');
-  return result.data;
+  return readConfig(WORKER_CONFIG_SCHEMA, 'worker', env);
 }
 export type WorkerConfig = z.infer<typeof WORKER_CONFIG_SCHEMA>;

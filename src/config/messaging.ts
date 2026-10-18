@@ -1,3 +1,4 @@
+import { readConfig } from '@/config/config.util';
 import { z } from 'zod';
 
 const MESSAGING_CONFIG_SCHEMA = z
@@ -24,12 +25,6 @@ const MESSAGING_CONFIG_SCHEMA = z
   });
 
 export function readMessagingConfig(env: NodeJS.ProcessEnv = process.env) {
-  const result = MESSAGING_CONFIG_SCHEMA.safeParse(env);
-  if (!result.success)
-    throw new Error(
-      'Invalid messaging configuration: ' +
-        result.error.issues.map((issue) => issue.path.join('.')).join(', '),
-    );
-  return result.data;
+  return readConfig(MESSAGING_CONFIG_SCHEMA, 'messaging', env);
 }
 export type MessagingConfig = z.infer<typeof MESSAGING_CONFIG_SCHEMA>;

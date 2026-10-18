@@ -210,15 +210,15 @@ test('each reversal kind is unique independently; rollback reverses all allowed 
 
 test('ordinary bet and reversal insufficiency have distinct machine-readable codes', () => {
   expectCode(
-    () => WagerTransaction.create(props()).assertSufficientBalance(brl('0')),
+    () => WagerTransaction.create(props()).assertSufficientBalance(brl('0'), LedgerDirection.Debit),
     FailureCode.InsufficientFunds,
   );
   const win = processed(Kind.Win);
   expectCode(
-    () => dependent(Kind.Rollback, win).assertSufficientBalance(brl('0'), win),
+    () => dependent(Kind.Rollback, win).assertSufficientBalance(brl('0'), LedgerDirection.Debit),
     FailureCode.ReversalInsufficientFunds,
   );
-  WagerTransaction.create(props()).assertSufficientBalance(brl());
+  WagerTransaction.create(props()).assertSufficientBalance(brl(), LedgerDirection.Debit);
   expect(WagerTransaction.create(props(Kind.Loss)).ledgerDirectionFor()).toBeUndefined();
 });
 

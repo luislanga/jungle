@@ -4,7 +4,6 @@ import { walletResponse } from '@/modules/wallet/presentation/wallet-response.ma
 import { ENDPOINTS, WALLET_ROUTES } from '@/shared/consts/endpoints.constant';
 import { Body, Controller, Get, Req, Inject, Param, Post, UseGuards } from '@nestjs/common';
 import { OpenWalletUseCase } from '@/modules/wallet/application/open-wallet.use-case';
-import { Money } from '@/shared/domain/money.domain';
 import { ChallengeAuthGuard } from '@/shared/presentation/challenge-auth.guard';
 import type { HttpRequestContext } from '@/shared/interfaces/http.interface';
 
@@ -21,7 +20,7 @@ export class WalletController {
     // TODO: fazer um wrapper do zod com o pipe do Nest para validação nos controllers mantendo o schema para validação por chamada do worker SQS posteriormente
     const input = OPEN_WALLET_SCHEMA.parse(body);
     const wallet = await this.openWallet.execute(
-      { playerId: input.playerId, initialBalance: Money.from(input.initialBalance) },
+      { playerId: input.playerId, initialBalance: input.initialBalance },
       // If not provided in headers, CorrelationMiddleware provided in app.module will generate an uuid for correlationId
       { correlationId: request.correlationId },
     );

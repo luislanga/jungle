@@ -1,3 +1,8 @@
+import {
+  requiresWagerReference,
+  allowsZeroWagerAmount,
+  isSelfReference,
+} from '@/shared/utils/wager.util';
 import { DOMAIN_ERRORS } from '@/shared/errors/errors.constant';
 import { LedgerDirection } from '@/shared/enums/wallet.enum';
 import {
@@ -45,7 +50,7 @@ export class WagerTransaction {
     if (transaction.requiresReference() && !props.referenceExternalTransactionId) {
       throw new DomainError(DOMAIN_ERRORS.REFERENCE_REQUIRED);
     }
-    if (props.referenceExternalTransactionId === props.externalTransactionId) {
+    if (isSelfReference(props.externalTransactionId, props.referenceExternalTransactionId)) {
       throw new DomainError(DOMAIN_ERRORS.INVALID_REFERENCE);
     }
     // README 7 allows WIN with or without a BET reference. A supplied reference
@@ -149,7 +154,7 @@ export class WagerTransaction {
   }
 
   requiresReference(): boolean {
-    return this.kind === WagerTransactionKind.Refund || this.kind === WagerTransactionKind.Rollback;
+    return requiresWagerReference(this.kind);
   }
 
   matchesPayload(hash: string): boolean {
@@ -195,11 +200,12 @@ export class WagerTransaction {
     return ReferenceValidationStatus.Ready;
   }
 
+  // Reference eligibility is checked by validateReference; this query only determines the movement.
   ledgerDirectionFor(reference?: WagerTransaction): LedgerDirection | undefined {
     if (this.kind === WagerTransactionKind.Loss) return undefined;
     if (this.kind === WagerTransactionKind.Bet) return LedgerDirection.Debit;
     if (this.kind === WagerTransactionKind.Rollback) {
-      if (!reference || this.validateReference(reference) !== ReferenceValidationStatus.Ready) {
+      if (!reference) {
         throw new DomainError(DOMAIN_ERRORS.REVERSAL_REFERENCE_NOT_PROCESSED);
       }
       return reference.kind === WagerTransactionKind.Bet
@@ -209,11 +215,8 @@ export class WagerTransaction {
     return LedgerDirection.Credit;
   }
 
-  assertSufficientBalance(balance: Money, reference?: WagerTransaction): void {
-    if (
-      this.ledgerDirectionFor(reference) === LedgerDirection.Debit &&
-      balance.isLessThan(this.money)
-    ) {
+  assertSufficientBalance(balance: Money, direction: LedgerDirection | undefined): void {
+    if (direction === LedgerDirection.Debit && balance.isLessThan(this.money)) {
       const error =
         this.kind === WagerTransactionKind.Rollback
           ? DOMAIN_ERRORS.REVERSAL_INSUFFICIENT_FUNDS
@@ -256,7 +259,7 @@ export class WagerTransaction {
     // Our agreed interpretation accepts zero LOSS; all money-moving kinds are positive.
     if (
       this.money.isNegative() ||
-      (this.kind !== WagerTransactionKind.Loss && !this.money.isPositive())
+      (!allowsZeroWagerAmount(this.kind) && !this.money.isPositive())
     ) {
       throw new DomainError(DOMAIN_ERRORS.INVALID_WAGER_AMOUNT);
     }

@@ -1,3 +1,4 @@
+import { readConfig } from '@/config/config.util';
 import { z } from 'zod';
 
 const OUTBOX_CONFIG_SCHEMA = z
@@ -14,8 +15,6 @@ const OUTBOX_CONFIG_SCHEMA = z
   });
 
 export function readOutboxConfig(env: NodeJS.ProcessEnv = process.env) {
-  const result = OUTBOX_CONFIG_SCHEMA.safeParse(env);
-  if (!result.success) throw new Error('Invalid outbox configuration');
-  return result.data;
+  return readConfig(OUTBOX_CONFIG_SCHEMA, 'outbox', env);
 }
 export type OutboxConfig = z.infer<typeof OUTBOX_CONFIG_SCHEMA>;

@@ -1,4 +1,5 @@
-import { QueryFailedError } from 'typeorm';
+import { postgresCause } from '@/database/postgres-error.util';
+
 import { isRetryablePostgresError } from '@/shared/utils/postgres.util';
 
 const DATABASE_UNAVAILABLE_CODES = new Set([
@@ -17,7 +18,7 @@ const DATABASE_UNAVAILABLE_CODES = new Set([
 // An interrupted COMMIT may already have succeeded. HTTP callers must retry the
 // same key; only the transaction helper decides which SQL failures can be retried internally.
 export function isTransientDatabaseError(error: unknown): boolean {
-  const cause: unknown = error instanceof QueryFailedError ? error.driverError : error;
+  const cause = postgresCause(error);
   if (
     typeof cause !== 'object' ||
     cause === null ||

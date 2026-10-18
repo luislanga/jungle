@@ -8,7 +8,7 @@ import {
   TEST_CONTEXT,
   wagerCommand,
 } from '@test/support/financial.util';
-import { ReconciliationSignals } from '@/modules/wallet/infrastructure/observability/reconciliation-signals.service';
+import { RECONCILIATION_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { ReconcileWalletUseCase } from '@/modules/wallet/application/reconcile-wallet.use-case';
 import type { ReconciliationResult } from '@/shared/interfaces/wallet.interface';
 
@@ -63,8 +63,7 @@ test('a privileged corruption fixture returns a signed discrepancy, logs it and 
     'SELECT balance,version FROM wagering.wallets WHERE id=$1',
     [wallet.id],
   );
-  const signals = http.app.get(ReconciliationSignals),
-    count = signals.discrepancyCount;
+  const count = (await RECONCILIATION_COUNT.get()).values[0]!.value;
   const logs: string[] = [];
   const output = spyOn(process.stdout, 'write').mockImplementation((chunk) => {
     logs.push(String(chunk));
@@ -83,7 +82,7 @@ test('a privileged corruption fixture returns a signed discrepancy, logs it and 
     difference: { amount: '-4.00', currency: 'BRL' },
     calculatedBalance: { amount: '100.00', currency: 'BRL' },
   });
-  expect(signals.discrepancyCount).toBe(count + 1);
+  expect((await RECONCILIATION_COUNT.get()).values[0]!.value).toBe(count + 1);
   expect(
     logs.some(
       (line) =>

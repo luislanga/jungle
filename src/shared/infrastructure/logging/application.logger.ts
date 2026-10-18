@@ -1,4 +1,5 @@
-import { QueryFailedError } from 'typeorm';
+import { postgresCause } from '@/database/postgres-error.util';
+
 import { LOG_FIELDS } from '@/shared/consts/logging.constant';
 import type { LogContext, LogLevel } from '@/shared/interfaces/logging.interface';
 import type { EventEnvelope } from '@/shared/interfaces/event.interface';
@@ -24,7 +25,7 @@ export function writeLog(event: string, context: LogContext = {}, level: LogLeve
 }
 
 export function safeErrorContext(error: unknown): LogContext {
-  const cause: unknown = error instanceof QueryFailedError ? error.driverError : error;
+  const cause = postgresCause(error);
   return {
     errorType: error instanceof Error ? error.name : 'UnknownError',
     errorCode:

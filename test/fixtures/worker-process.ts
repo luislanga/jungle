@@ -67,15 +67,17 @@ if (process.env.TEST_WORKER_MODE === 'hold-after-publish') {
   };
 }
 const consumer = new SqsWagerConsumer(sqs, processWager, messaging);
+const worker = readWorkerConfig();
 const runtime = new WorkerRuntime(
   consumer,
   new OutboxPublisher(createOutboxStore(dataSource, database), sqs, outbox),
   new PendingReferenceResolver(createPendingWorkStore(dataSource, database), processWager, pending),
   {
-    worker: readWorkerConfig(),
-    messaging,
-    outbox,
-    pending,
+    enabled: worker.WORKERS_ENABLED,
+    shutdownDrainMs: worker.SHUTDOWN_DRAIN_MS,
+    sqsRequestTimeoutMs: messaging.SQS_REQUEST_TIMEOUT_MS,
+    outboxPollIntervalMs: outbox.OUTBOX_POLL_INTERVAL_MS,
+    pendingPollIntervalMs: pending.PENDING_REFERENCE_POLL_INTERVAL_MS,
   },
 );
 process.once('SIGTERM', () => {

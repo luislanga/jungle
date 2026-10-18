@@ -54,26 +54,22 @@ export class OutboxMessageRepository {
 
   async markPublished(id: string, token: string): Promise<boolean> {
     requireTransaction(this.manager);
-    const rows = await this.manager.query<Array<{ id: string }>>(
-      `WITH completed AS (
-      UPDATE wagering.outbox_messages SET published_at=clock_timestamp(),claim_owner=NULL,claim_token=NULL,claim_until=NULL
-      WHERE id=$1 AND claim_token=$2 AND claim_until>clock_timestamp() AND published_at IS NULL RETURNING id
-    ) SELECT id FROM completed`,
+    const [, affected] = await this.manager.query<[unknown[], number]>(
+      `UPDATE wagering.outbox_messages SET published_at=clock_timestamp(),claim_owner=NULL,claim_token=NULL,claim_until=NULL
+      WHERE id=$1 AND claim_token=$2 AND claim_until>clock_timestamp() AND published_at IS NULL RETURNING id`,
       [id, token],
     );
-    return rows.length === 1;
+    return affected === 1;
   }
 
   async scheduleRetry(id: string, token: string, nextAttemptAt: Date): Promise<boolean> {
     requireTransaction(this.manager);
-    const rows = await this.manager.query<Array<{ id: string }>>(
-      `WITH retried AS (
-      UPDATE wagering.outbox_messages SET attempts=attempts+1,next_attempt_at=$3,
+    const [, affected] = await this.manager.query<[unknown[], number]>(
+      `UPDATE wagering.outbox_messages SET attempts=attempts+1,next_attempt_at=$3,
         claim_owner=NULL,claim_token=NULL,claim_until=NULL
-      WHERE id=$1 AND claim_token=$2 AND claim_until>clock_timestamp() AND published_at IS NULL RETURNING id
-    ) SELECT id FROM retried`,
+      WHERE id=$1 AND claim_token=$2 AND claim_until>clock_timestamp() AND published_at IS NULL RETURNING id`,
       [id, token, nextAttemptAt],
     );
-    return rows.length === 1;
+    return affected === 1;
   }
 }

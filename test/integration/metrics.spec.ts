@@ -1,3 +1,5 @@
+import { readOutboxConfig } from '@/config/outbox';
+import { readPendingReferenceConfig } from '@/config/pending-reference';
 import {
   createPendingWorkStore,
   createOutboxStore,
@@ -26,6 +28,7 @@ import {
   LOCK_CONFLICT_COUNT,
   RETRY_COUNT,
   METRICS_REGISTRY,
+  RECONCILIATION_COUNT,
 } from '@/shared/infrastructure/metrics/metrics';
 import { WagerTransactionKind as Kind } from '@/shared/enums/wager.enum';
 
@@ -54,6 +57,7 @@ test('real transitions/replays/retries, lock conflicts, latency, Outbox lag, DLQ
   const wallet = await openTestWallet(db.app),
     service = financialServices(db.app).process,
     command = wagerCommand(wallet);
+  const discrepancies = (await RECONCILIATION_COUNT.get()).values[0]!.value;
   const processed = await counter(OUTCOME_COUNT, 'PROCESSED'),
     duplicates = await counter(DUPLICATE_COUNT);
   await service.execute(command, TEST_CONTEXT);
@@ -76,6 +80,7 @@ test('real transitions/replays/retries, lock conflicts, latency, Outbox lag, DLQ
   await new PendingReferenceResolver(
     createPendingWorkStore(db.app, financialServices(db.app).config),
     service,
+    readPendingReferenceConfig(),
   ).runOnce();
   expect(await counter(RETRY_COUNT, 'pending_reference')).toBeGreaterThan(0);
   expect(await counter(OUTCOME_COUNT, 'PENDING_REFERENCE')).toBe(pendingOutcomes);
@@ -137,6 +142,7 @@ test('real transitions/replays/retries, lock conflicts, latency, Outbox lag, DLQ
   const publish = new OutboxPublisher(
     createOutboxStore(db.app, financialServices(db.app).config),
     db.sqs,
+    readOutboxConfig(),
   );
   const sends = spyOn(db.sqs, 'send').mockRejectedValueOnce(new Error('Injected send failure'));
   try {
@@ -153,7 +159,7 @@ test('real transitions/replays/retries, lock conflicts, latency, Outbox lag, DLQ
     (await http.request(`/wallets/${wallet.id}/reconciliation`, { method: 'POST' })).status,
   ).toBe(200);
   expect(await (await http.request('/metrics')).text()).toContain(
-    'wager_reconciliation_discrepancies 1',
+    `wager_reconciliation_discrepancies ${discrepancies + 1}`,
   );
   await db.owner.query(
     'UPDATE wagering.wallets SET balance=75,version=version+1,updated_at=now() WHERE id=$1',

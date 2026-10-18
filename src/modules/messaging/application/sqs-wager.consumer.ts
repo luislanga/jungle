@@ -1,7 +1,7 @@
 import { RETRY_COUNT } from '@/shared/infrastructure/metrics/metrics';
 import { safeErrorContext, writeLog } from '@/shared/infrastructure/logging/application.logger';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { readMessagingConfig, type MessagingConfig } from '@/config/messaging';
+import type { MessagingConfig } from '@/config/messaging';
 import {
   deliveryFailureKind,
   deliveryRetryDelay,
@@ -18,7 +18,7 @@ export class SqsWagerConsumer {
   constructor(
     private readonly sqs: MessageQueue,
     private readonly processWager: ProcessWagerTransactionUseCase,
-    private readonly config: MessagingConfig = readMessagingConfig(),
+    private readonly config: MessagingConfig,
   ) {}
 
   async pollOnce(signal?: AbortSignal) {

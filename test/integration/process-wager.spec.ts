@@ -35,7 +35,10 @@ beforeAll(async () => {
     DATABASE_URL: db.app.options.type === 'postgres' ? db.app.options.url! : '',
   });
   openWallet = new OpenWalletUseCase(createFinancialTransaction(db.app, config));
-  processWager = new ProcessWagerTransactionUseCase(createFinancialTransaction(db.app, config));
+  processWager = new ProcessWagerTransactionUseCase(
+    createFinancialTransaction(db.app, config),
+    readPendingReferenceConfig(),
+  );
 }, 120_000);
 afterAll(async () => {
   await db?.close();

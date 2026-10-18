@@ -1,15 +1,12 @@
 import type { WalletQueries } from '@/shared/interfaces/wallet-queries.interface';
-import type { ReconciliationSignals } from '@/modules/wallet/infrastructure/observability/reconciliation-signals.service';
+import { recordReconciliationDiscrepancy } from '@/shared/infrastructure/metrics/metrics';
 import { ApplicationError } from '@/shared/errors/application.error';
 import { APPLICATION_ERRORS } from '@/shared/errors/errors.constant';
 import type { EventContext } from '@/shared/interfaces/event.interface';
 import type { ReconciliationResult } from '@/shared/interfaces/wallet.interface';
 
 export class ReconcileWalletUseCase {
-  constructor(
-    private readonly queries: WalletQueries,
-    private readonly signals: ReconciliationSignals,
-  ) {}
+  constructor(private readonly queries: WalletQueries) {}
 
   async execute(walletId: string, context: EventContext): Promise<ReconciliationResult> {
     const row = await this.queries.reconcile(walletId);
@@ -25,7 +22,7 @@ export class ReconcileWalletUseCase {
       checkedEntries: row.checkedEntries,
     };
 
-    if (!result.consistent) this.signals.recordDiscrepancy(result, context);
+    if (!result.consistent) recordReconciliationDiscrepancy(result, context);
     return result;
   }
 }

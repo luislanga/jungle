@@ -1,17 +1,17 @@
+import type { IntegrationEvent } from '@/shared/domain/integration-event.domain';
+import type { EventContext } from '@/shared/interfaces/event.interface';
 import type {
   FinancialTransaction,
   FinancialRepositories,
 } from '@/shared/interfaces/financial-transaction.interface';
 import {
-  PROCESSING_DURATION,
+  startProcessingTimer,
+  recordMetrics,
   recordWagerResult,
   OUTCOME_COUNT,
 } from '@/shared/infrastructure/metrics/metrics';
 import { writeLog } from '@/shared/infrastructure/logging/application.logger';
-import {
-  readPendingReferenceConfig,
-  type PendingReferenceConfig,
-} from '@/config/pending-reference';
+import type { PendingReferenceConfig } from '@/config/pending-reference';
 import { WagerTransaction } from '@/modules/wagering/domain/wager-transaction.domain';
 import { WalletLedgerEntry } from '@/modules/wallet/domain/wallet-ledger-entry.domain';
 import { InboxMessage } from '@/modules/messaging/domain/inbox-message.domain';
@@ -42,14 +42,14 @@ import type {
 export class ProcessWagerTransactionUseCase {
   constructor(
     private readonly transaction: FinancialTransaction,
-    private readonly pendingConfig: PendingReferenceConfig = readPendingReferenceConfig(),
+    private readonly pendingConfig: PendingReferenceConfig,
   ) {}
 
   async execute(
     command: WagerCommand,
     context: WagerProcessingContext,
   ): Promise<WagerProcessingResult> {
-    const observe = PROCESSING_DURATION.startTimer({ operation: 'submit' });
+    const stopTimer = startProcessingTimer('submit');
     try {
       // HTTP and SQS use this same path. These repositories share one database
       // transaction, so a failed commit leaves no wallet, ledger, Inbox or Outbox changes.
@@ -89,14 +89,9 @@ export class ProcessWagerTransactionUseCase {
               InboxMessage.receive({ ...context.inbox, payloadHash: command.payloadHash }),
             )
           : undefined;
-        if (!created) {
-          if (inbox) {
-            inbox.markProcessed(new Date());
-            await repositories.inbox.save(inbox);
-          }
-          return this.result(stored, true);
-        }
-        const result = await this.apply(repositories, stored.transaction, context);
+        const result = created
+          ? await this.apply(repositories, stored.transaction, context)
+          : this.result(stored, true);
         if (inbox) {
           inbox.markProcessed(new Date());
           await repositories.inbox.save(inbox);
@@ -115,7 +110,7 @@ export class ProcessWagerTransactionUseCase {
       });
       return result;
     } finally {
-      observe();
+      stopTimer();
     }
   }
 
@@ -124,7 +119,7 @@ export class ProcessWagerTransactionUseCase {
     token: string,
     context: WagerProcessingContext,
   ): Promise<WagerProcessingResult> {
-    const observe = PROCESSING_DURATION.startTimer({ operation: 'resume' });
+    const stopTimer = startProcessingTimer('resume');
     try {
       // The resolver claims work in a separate, committed transaction, then follows
       // the same business-row -> wallet lock order as normal ingress.
@@ -162,7 +157,7 @@ export class ProcessWagerTransactionUseCase {
         };
       });
       if (outcome.result.status !== WagerTransactionStatus.PendingReference)
-        OUTCOME_COUNT.inc({ status: outcome.result.status });
+        recordMetrics(() => OUTCOME_COUNT.inc({ status: outcome.result.status }));
       writeLog('wager_reference_resumed', {
         ...context,
         transactionId,
@@ -173,7 +168,7 @@ export class ProcessWagerTransactionUseCase {
       });
       return outcome.result;
     } finally {
-      observe();
+      stopTimer();
     }
   }
 
@@ -220,8 +215,8 @@ export class ProcessWagerTransactionUseCase {
         transaction.validateReference(reference, reversals) ===
         ReferenceValidationStatus.PendingReference;
       if (!pendingReference) {
-        transaction.assertSufficientBalance(before, reference);
         direction = transaction.ledgerDirectionFor(reference);
+        transaction.assertSufficientBalance(before, direction);
         if (direction === LedgerDirection.Debit) wallet.debit(transaction.money, at);
         if (direction === LedgerDirection.Credit) wallet.credit(transaction.money, at);
       }
@@ -266,22 +261,12 @@ export class ProcessWagerTransactionUseCase {
         new Date(at.getTime() + this.pendingConfig.PENDING_REFERENCE_TTL_MS),
         nextReferenceAttempt(at, 0, this.pendingConfig),
       );
+    }
+    if (!wasPending || transaction.status !== WagerTransactionStatus.PendingReference) {
       await outbox.enqueue(
-        OutboxMessage.enqueue(WagerTransactionPendingReference.from(transaction, eventContext)),
+        OutboxMessage.enqueue(this.outcomeEvent(transaction, wallet.balance, eventContext)),
       );
     }
-    if (transaction.status === WagerTransactionStatus.Processed)
-      await outbox.enqueue(
-        OutboxMessage.enqueue(
-          WagerTransactionProcessed.from(transaction, wallet.balance, eventContext),
-        ),
-      );
-    if (transaction.status === WagerTransactionStatus.Rejected)
-      await outbox.enqueue(
-        OutboxMessage.enqueue(
-          WagerTransactionRejected.from(transaction, wallet.balance, eventContext),
-        ),
-      );
     if (entry)
       await outbox.enqueue(
         OutboxMessage.enqueue(
@@ -291,6 +276,23 @@ export class ProcessWagerTransactionUseCase {
           }),
         ),
       );
-    return this.result({ transaction: transaction, resultBalance: wallet.balance }, false);
+    return this.result({ transaction, resultBalance: wallet.balance }, false);
+  }
+
+  private outcomeEvent(
+    transaction: WagerTransaction,
+    balance: Money,
+    context: EventContext,
+  ): IntegrationEvent<unknown> {
+    switch (transaction.status) {
+      case WagerTransactionStatus.Processed:
+        return WagerTransactionProcessed.from(transaction, balance, context);
+      case WagerTransactionStatus.Rejected:
+        return WagerTransactionRejected.from(transaction, balance, context);
+      case WagerTransactionStatus.PendingReference:
+        return WagerTransactionPendingReference.from(transaction, context);
+      default:
+        throw new DomainError(DOMAIN_ERRORS.INVALID_TRANSACTION_STATE);
+    }
   }
 }

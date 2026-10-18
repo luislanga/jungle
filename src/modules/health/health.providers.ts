@@ -11,7 +11,6 @@ import {
 import { HealthChecksAdapter } from '@/modules/health/infrastructure/health-checks.adapter';
 import { createOutboxLagReader } from '@/modules/health/infrastructure/outbox-lag.factory';
 import { MetricsService } from '@/modules/health/application/metrics.service';
-import { ReconciliationSignals } from '@/modules/wallet/infrastructure/observability/reconciliation-signals.service';
 
 export const HEALTH_PROVIDERS: Provider[] = [
   {
@@ -27,11 +26,8 @@ export const HEALTH_PROVIDERS: Provider[] = [
   },
   {
     provide: MetricsService,
-    inject: [OUTBOX_LAG_READER, MESSAGE_QUEUE, ReconciliationSignals],
-    useFactory: (
-      readOutboxLag: OutboxLagReader,
-      sqs: MessageQueue,
-      reconciliation: ReconciliationSignals,
-    ) => new MetricsService(readOutboxLag, sqs, reconciliation),
+    inject: [OUTBOX_LAG_READER, MESSAGE_QUEUE],
+    useFactory: (readOutboxLag: OutboxLagReader, sqs: MessageQueue) =>
+      new MetricsService(readOutboxLag, sqs),
   },
 ];

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import process from 'node:process';
@@ -45,7 +46,7 @@ async function run() {
         encoding: 'utf8',
       })
         .split('\0')
-        .filter(Boolean),
+        .filter((file) => file && existsSync(file)),
     ),
   ];
   let changed = 0;

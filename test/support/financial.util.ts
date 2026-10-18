@@ -1,3 +1,4 @@
+import { readPendingReferenceConfig } from '@/config/pending-reference';
 import { createFinancialTransaction } from '@/database/financial-transaction.factory';
 import { expect } from 'bun:test';
 import type { DataSource } from 'typeorm';
@@ -18,7 +19,10 @@ export function financialServices(dataSource: DataSource) {
   return {
     config,
     open: new OpenWalletUseCase(createFinancialTransaction(dataSource, config)),
-    process: new ProcessWagerTransactionUseCase(createFinancialTransaction(dataSource, config)),
+    process: new ProcessWagerTransactionUseCase(
+      createFinancialTransaction(dataSource, config),
+      readPendingReferenceConfig(),
+    ),
   };
 }
 
